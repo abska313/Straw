@@ -2055,4 +2055,470 @@ class UI {
     setTimeout(() => document.body.classList.remove('level-flash'), 800);
   }
   saveFlash(text, fading) {
-    const t = this.el.saveToast; if
+    const t = this.el.saveToast; if (!t) return;
+    t.textContent = text;
+    t.classList.remove('hidden');
+    t.style.opacity = '1';
+    if (fading) setTimeout(() => { t.style.opacity = '0'; }, 700);
+  }
+  showTutorial(text, ms = 5000) {
+    this.el.tutorialText.textContent = text;
+    this.el.tutorial.classList.remove('hidden');
+    clearTimeout(this.tutorialTimer);
+    this.tutorialTimer = setTimeout(() => this.el.tutorial.classList.add('hidden'), ms);
+  }
+}
+
+/* ==================== GAME ==================== */
+class Game {
+  constructor() {
+    this.clock = new THREE.Clock();
+    this.state = { money: 50, xp: 0, level: 1, toolId: 'hands', hayRemoved: 0, foundNeedle: false, xpToNext: 100 };
+    this.hayPiles = [];
+    this.savedData = null;
+    this.storage = new Storage(500);
+  }
+  xpForLevel(level) { return Math.floor(100 + (level - 1) * 100 + Math.pow(level - 1, 2) * 50); }
+
+  async init() {
+    // Renderer
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
+    document.getElementById('game-container').appendChild(this.renderer.domElement);
+
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 500);
+
+    this.events = new EventBus();
+    this.saveSystem = new SaveSystem();
+    await this.saveSystem.init();
+    try {
+      this.savedData = await this.saveSystem.load('main2') || await this.saveSystem.load('main');
+    } catch (e) { console.warn('Save load failed:', e); }
+
+    this.input = new Input();
+    this.audio = new AudioSystem(); this.audio.init();
+
+    this.world = new World(this.scene);
+    this.world.build();
+
+    this.inventory = new Inventory(24);
+    this.toolSystem = new ToolSystem();
+    this.skills = new SkillTree();
+    this.statistics = new Statistics();
+    this.player = new Player(this.camera, this.input);
+
+    this.raycaster = new THREE.Raycaster();
+    this.raycaster.far = 3.5;
+
+    this.missions = new MissionSystem(this);
+    this.achievements = new AchievementSystem(this);
+    this.areas = new AreaSystem(this);
+    this.machines = new MachineManager(this);
+
+    this.ui = new UI(this);
+
+    this.buildAreaPiles('field');
+
+    if (this.savedData) {
+      try { this.restore(this.savedData); this.ui.notify('Progress loaded.', 'uncommon'); }
+      catch (e) { console.error('Restore error:', e); }
+    } else {
+      this.ui.showTutorial('🎯 Find the lost needle hidden in the haystack.', 7000);
+    }
+
+    this.setupJoystick();
+    this.setupTouchLook();
+    window.addEventListener('resize', () => this.onResize());
+    window.addEventListener('pointerdown', () => this.audio.resume(), { once: true });
+
+    setInterval(() => this.saveGame(), 20000);
+    window.addEventListener('beforeunload', () => this.saveGame());
+
+    this.events.on('itemFound', () => { this.statistics.inc('itemsFound', 1); this.checkProgress(); });
+    this.events.on('hayRemoved', d => { this.statistics.inc('hayRemoved', d.amount); this.checkProgress(); });
+
+    this.ui.refresh();
+  }
+
+  buildAreaPiles(areaId) {
+    for (const p of this.hayPiles) p.dispose();
+    this.hayPiles = [];
+    const area = this.areas.get(areaId) || AREAS[0];
+    const seedBase = areaId.length * 1000;
+    for (let i = 0; i < area.piles; i++) {
+      const angle = (i / area.piles) * Math.PI * 2 + 0.6;
+      const r = 8 + i * 2.5;
+      const pos = new THREE.Vector3(area.pos.x + Math.cos(angle) * r, 0, area.pos.z + Math.sin(angle) * r - 3);
+      const size = { x: 3 + Math.random() * 1.2, y: 2.2 + Math.random() * 0.8, z: 3 + Math.random() * 1.2 };
+      const pile = new HayPile(this.scene, pos, area.hayPerPile, size, seedBase + i * 37);
+      pile.area = area;
+      this.hayPiles.push(pile);
+    }
+  }
+
+  switchArea(areaId) {
+    if (!this.areas.unlocked[areaId]) return;
+    this.areas.current = areaId;
+    const area = this.areas.get(areaId);
+    this.player.position.set(area.pos.x, 1.7, area.pos.z + 5);
+    this.buildAreaPiles(areaId);
+    this.machines.machines = this.machines.machines.filter(m => this.hayPiles.includes(m.targetPile));
+    this.ui.notify(`🌍 Entered ${area.name}`, 'rare');
+    this.ui.refresh();
+  }
+
+  start() {
+    this.clock.start();
+    const loop = () => {
+      const dt = Math.min(this.clock.getDelta(), 0.05);
+      this.update(dt);
+      this.renderer.render(this.scene, this.camera);
+      requestAnimationFrame(loop);
+    };
+    loop();
+  }
+
+  update(dt) {
+    if (this.ui.panelOpen) { this.input.move.x = 0; this.input.move.y = 0; }
+    this.player.update(dt);
+    this.player.regenStamina(dt, this.skills.staminaRegenMult());
+    this.statistics.data.playTime += dt;
+
+    if (this.input.consumeAction()) this.doInteract();
+
+    const tool = this.toolSystem.get(this.state.toolId);
+    const tier = tool.tier + this.skills.effectiveTierBonus();
+    const area = this.areas.get(this.areas.current) || AREAS[0];
+    const ctx = {
+      tier,
+      itemMult: area.itemMult,
+      rareMult: area.rareMult,
+      precisionBonus: this.skills.itemChanceMult() - 1,
+      rareBonus: this.skills.rareChanceBonus(),
+      treasureBonus: this.skills.treasureBonus()
+    };
+    for (const p of this.hayPiles) p.setSearchContext(ctx);
+
+    this.machines.update(dt);
+
+    const target = this.getLookTarget();
+    this.ui.updatePrompt(target);
+    if (target) {
+      const pile = this.hayPiles.find(p => p.proxy === target.object);
+      if (pile && pile.remaining === 0) this.ui.el.prompt.textContent = '⛔ Empty';
+      else if (this.toolSystem.isBroken(this.state.toolId)) this.ui.el.prompt.textContent = '🔧 Tool Broken';
+      else if (this.player.exhausted) this.ui.el.prompt.textContent = '😮‍💨 Exhausted';
+      else this.ui.el.prompt.textContent = '⛏ Remove Hay';
+    }
+
+    this.ui.tick(dt);
+  }
+
+  getLookTarget() {
+    this.raycaster.setFromCamera({ x: 0, y: 0 }, this.camera);
+    const proxies = this.hayPiles.map(p => p.proxy);
+    const hits = this.raycaster.intersectObjects(proxies, false);
+    return hits[0] || null;
+  }
+
+  doInteract() {
+    if (this.ui.panelOpen) return;
+    const hit = this.getLookTarget();
+    if (!hit) { this.player.addShake(0.08); this.audio.play('error'); return; }
+    const pile = this.hayPiles.find(p => p.proxy === hit.object);
+    if (!pile || pile.remaining <= 0) { this.player.addShake(0.08); return; }
+
+    const toolId = this.state.toolId;
+    const tool = this.toolSystem.get(toolId);
+    if (this.toolSystem.isBroken(toolId)) {
+      this.ui.notify('🔧 Tool broken! Repair it.', 'rare');
+      this.audio.play('broken');
+      return;
+    }
+    if (this.player.exhausted) {
+      this.ui.notify('😮‍💨 Too exhausted.', 'common');
+      return;
+    }
+    this.player.drainStamina(tool.stamina * 2);
+
+    const skillMult = this.skills.searchYieldMult() * this.skills.toolYieldMult();
+    const yieldAmount = this.toolSystem.getYield(toolId, skillMult);
+    const result = pile.removeAt(hit.point, yieldAmount);
+    if (result.removed <= 0) return;
+
+    this.inventory.add('hay', result.removed);
+    this.state.hayRemoved += result.removed;
+    this.statistics.inc('searches', 1);
+    this.statistics.inc('toolsUsed', 1);
+
+    const duraCost = tool.durCost * this.skills.durabilityMult();
+    if (duraCost > 0) {
+      this.toolSystem.damage(toolId, duraCost);
+      if (this.toolSystem.isBroken(toolId)) {
+        this.ui.notify(`🔧 ${tool.name} broke!`, 'rare');
+        this.audio.play('broken');
+      }
+    }
+
+    this.player.addShake(0.15);
+    this.audio.play('removeHay');
+    this.addXP(Math.max(1, Math.floor(result.removed / 8)));
+
+    const found = pile.rollItems(result.removed);
+    for (const f of found) {
+      const item = ITEMS[f.id];
+      if (!item) continue;
+      this.inventory.add(f.id, f.qty);
+      const rare = ['rare','epic','legendary','mythic'].includes(item.rarity);
+      if (rare) this.statistics.inc('rareFound', f.qty);
+      if (item.rarity === 'epic') this.statistics.inc('epicFound', f.qty);
+      if (item.rarity === 'legendary') this.statistics.inc('legendaryFound', f.qty);
+      if (item.rarity === 'mythic') this.statistics.inc('mythicFound', f.qty);
+      if (item.category === 'needle') {
+        this.statistics.inc('needlesFound', f.qty);
+        if (!this.state.foundNeedle) {
+          this.state.foundNeedle = true;
+          this.ui.showTutorial('✅ You found a needle!', 7000);
+        }
+      }
+      this.events.emit('itemFound', { id: f.id, qty: f.qty, pile });
+      this.ui.notify(`+${f.qty} ${item.name}`, item.rarity);
+      this.ui.discoveryPopup(item, f.qty);
+      this.addXP((RARITIES[item.rarity]?.xp || 1) * f.qty);
+      if (item.rarity === 'legendary' || item.rarity === 'mythic') this.audio.play('findLegendary');
+      else if (rare) this.audio.play('findRare');
+      else this.audio.play('findItem');
+    }
+    this.ui.refresh();
+  }
+
+  checkProgress() { this.missions.check(); this.achievements.check(); }
+
+  addXP(amount) {
+    if (amount <= 0) return;
+    this.state.xp += amount;
+    this.statistics.inc('xpEarned', amount);
+    let need = this.xpForLevel(this.state.level);
+    while (this.state.xp >= need) {
+      this.state.xp -= need;
+      this.state.level++;
+      this.skills.grant(1);
+      this.state.money += 25;
+      this.ui.notify(`★ LEVEL UP! Lv.${this.state.level} · +1 SP`, 'epic');
+      this.ui.levelUpFlash();
+      this.audio.play('levelUp');
+      this.player.addShake(0.3);
+      need = this.xpForLevel(this.state.level);
+      this.checkProgress();
+      this.saveGame();
+    }
+    this.state.xpToNext = need;
+  }
+
+  sellItem(id, qty) {
+    const have = this.inventory.count(id);
+    const actual = Math.min(qty, have);
+    if (actual <= 0) return 0;
+    const item = ITEMS[id];
+    const unit = Math.floor(item.value * this.skills.sellPriceMult());
+    const total = unit * actual;
+    this.inventory.remove(id, actual);
+    this.state.money += total;
+    this.statistics.inc('moneyEarned', total);
+    this.statistics.inc('itemsSold', actual);
+    this.audio.play('sell');
+    this.ui.refresh();
+    return total;
+  }
+  sellAll() {
+    let total = 0, count = 0;
+    for (const slot of [...this.inventory.slots]) {
+      const item = ITEMS[slot.id]; if (!item?.sellable) continue;
+      const unit = Math.floor(item.value * this.skills.sellPriceMult());
+      total += unit * slot.qty;
+      count += slot.qty;
+      this.inventory.remove(slot.id, slot.qty);
+    }
+    this.state.money += total;
+    this.statistics.inc('moneyEarned', total);
+    this.statistics.inc('itemsSold', count);
+    this.audio.play('sell');
+    this.ui.refresh();
+    return total;
+  }
+  applyShopDiscount(price) { return Math.floor(price * this.skills.shopPriceMult()); }
+
+  setupJoystick() {
+    const joy = document.getElementById('joystick');
+    const knob = document.getElementById('joystick-knob');
+    let joyId = null; const R = 55; const center = { x:0, y:0 };
+    const update = (cx, cy) => {
+      const dx = cx - center.x, dy = cy - center.y;
+      const dist = Math.hypot(dx, dy); const clamped = Math.min(dist, R);
+      const nx = dist > 0 ? (dx / dist) : 0, ny = dist > 0 ? (dy / dist) : 0;
+      knob.style.transform = `translate(calc(-50% + ${nx*clamped}px), calc(-50% + ${ny*clamped}px))`;
+      this.input.move.x = nx * (clamped / R);
+      this.input.move.y = ny * (clamped / R);
+    };
+    const reset = () => { knob.style.transform = 'translate(-50%, -50%)'; this.input.move.x = 0; this.input.move.y = 0; };
+    joy.addEventListener('touchstart', e => {
+      e.preventDefault();
+      const t = e.changedTouches[0];
+      const rect = joy.getBoundingClientRect();
+      center.x = rect.left + rect.width / 2; center.y = rect.top + rect.height / 2;
+      joyId = t.identifier; update(t.clientX, t.clientY);
+    }, { passive:false });
+    joy.addEventListener('touchmove', e => {
+      e.preventDefault();
+      for (const t of e.changedTouches) if (t.identifier === joyId) update(t.clientX, t.clientY);
+    }, { passive:false });
+    const end = e => { for (const t of e.changedTouches) if (t.identifier === joyId) { joyId = null; reset(); } };
+    joy.addEventListener('touchend', end);
+    joy.addEventListener('touchcancel', end);
+  }
+
+  setupTouchLook() {
+    const area = document.getElementById('look-area');
+    let lookId = null; let lastX = 0, lastY = 0;
+    area.addEventListener('touchstart', e => {
+      if (e.target.closest('#buttons, #joystick, #panels, #hud, #quick-buttons')) return;
+      const t = e.changedTouches[0];
+      lookId = t.identifier; lastX = t.clientX; lastY = t.clientY;
+    }, { passive:true });
+    area.addEventListener('touchmove', e => {
+      for (const t of e.changedTouches) if (t.identifier === lookId) {
+        this.input.look.dx += t.clientX - lastX;
+        this.input.look.dy += t.clientY - lastY;
+        lastX = t.clientX; lastY = t.clientY;
+      }
+    }, { passive:true });
+    const end = e => { for (const t of e.changedTouches) if (t.identifier === lookId) lookId = null; };
+    area.addEventListener('touchend', end);
+    area.addEventListener('touchcancel', end);
+    // Mouse fallback for desktop testing
+    let mouseDown = false;
+    area.addEventListener('mousedown', e => { mouseDown = true; lastX = e.clientX; lastY = e.clientY; });
+    window.addEventListener('mouseup', () => mouseDown = false);
+    window.addEventListener('mousemove', e => {
+      if (!mouseDown) return;
+      this.input.look.dx += e.clientX - lastX;
+      this.input.look.dy += e.clientY - lastY;
+      lastX = e.clientX; lastY = e.clientY;
+    });
+  }
+
+  restore(d) {
+    if (d.state) this.state = { ...this.state, ...d.state };
+    if (d.inventory) this.inventory.deserialize(d.inventory);
+    if (d.tools) {
+      this.toolSystem.deserialize(d.tools);
+      if (d.tools.owned) this.toolSystem.migrateLegacy(d.tools.owned);
+    }
+    if (d.player) this.player.deserialize(d.player);
+    if (d.skills) this.skills.deserialize(d.skills);
+    if (d.statistics) this.statistics.deserialize(d.statistics);
+    if (d.missions) this.missions.deserialize(d.missions);
+    if (d.achievements) this.achievements.deserialize(d.achievements);
+    if (d.areas) this.areas.deserialize(d.areas);
+    if (d.storage) this.storage.deserialize(d.storage);
+    if (d.piles && d.areaId === this.areas.current) {
+      for (let i = 0; i < Math.min(this.hayPiles.length, d.piles.length); i++)
+        this.hayPiles[i].deserialize(d.piles[i]);
+    }
+    if (d.machines) this.machines.deserialize(d.machines);
+    this.state.xpToNext = this.xpForLevel(this.state.level);
+    this.player.setMaxStamina(100 + this.skills.maxStaminaBonus());
+  }
+
+  async saveGame() {
+    const data = {
+      state: { ...this.state },
+      inventory: this.inventory.serialize(),
+      tools: this.toolSystem.serialize(),
+      player: this.player.serialize(),
+      skills: this.skills.serialize(),
+      statistics: this.statistics.serialize(),
+      missions: this.missions.serialize(),
+      achievements: this.achievements.serialize(),
+      areas: this.areas.serialize(),
+      storage: this.storage.serialize(),
+      machines: this.machines.serialize(),
+      piles: this.hayPiles.map(p => p.serialize()),
+      areaId: this.areas.current
+    };
+    try {
+      await this.saveSystem.save('main2', data);
+      this.ui.saveFlash('SAVING...', false);
+      setTimeout(() => this.ui.saveFlash('GAME SAVED', true), 120);
+    } catch (e) { console.warn('Save failed:', e); }
+  }
+
+  saveSettings() {
+    localStorage.setItem('haystack-settings', JSON.stringify({
+      sens: this.input.sensitivity, fov: this.camera.fov, audio: this.audio.enabled
+    }));
+  }
+  loadSettings() {
+    try {
+      const s = JSON.parse(localStorage.getItem('haystack-settings') || '{}');
+      if (s.sens) this.input.sensitivity = s.sens;
+      if (s.fov) { this.camera.fov = s.fov; this.camera.updateProjectionMatrix(); }
+      if (typeof s.audio === 'boolean') this.audio.enabled = s.audio;
+    } catch (e) {}
+  }
+
+  onResize() {
+    this.camera.aspect = window.innerWidth / window.innerHeight;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+}
+
+/* ==================== BOOTSTRAP ==================== */
+
+// Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js', { scope: './' })
+      .then(reg => console.log('[PWA] SW registered:', reg.scope))
+      .catch(err => console.warn('[PWA] SW failed:', err));
+  });
+}
+
+// Prevent iOS double-tap zoom
+let _lastTouch = 0;
+document.addEventListener('touchend', e => {
+  const now = Date.now();
+  if (now - _lastTouch <= 300) e.preventDefault();
+  _lastTouch = now;
+}, { passive: false });
+
+// Prevent context menu
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+// Start game
+window.addEventListener('DOMContentLoaded', async () => {
+  const game = new Game();
+  window.__game = game;
+  try {
+    await game.init();
+    game.loadSettings();
+    game.start();
+  } catch (err) {
+    console.error('Game failed to start:', err);
+    document.body.innerHTML =
+      '<div style="padding:40px;color:#fff;font-family:sans-serif;">' +
+      'Failed to start: ' + err.message + '</div>';
+  }
+});
+</script>
+
+</body>
+</html>
