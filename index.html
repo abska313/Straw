@@ -1,1183 +1,2058 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-<!-- ============================================================
-  HAYSTACK — v0.2.0 (تحكم لمسي محسّن + دعم PWA متكامل)
-============================================================ -->
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#1b130a">
-<meta name="mobile-web-app-capable" content="yes">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#d4b75c">
+<meta name="description" content="محاكي 3D للبحث عن الإبر في أكوام القش">
+<meta name="format-detection" content="telephone=no">
+<meta name="msapplication-TileColor" content="#0a1a0f">
+
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="./icon-512.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="HAYSTACK">
+<meta name="mobile-web-app-capable" content="yes">
 
-<!-- ربط ملف الـ PWA والأيقونات -->
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
-<link rel="icon" type="image/png" href="icon-192.png">
+<title>HAYSTACK</title>
 
-<title>HAYSTACK — محاكي البحث في القش</title>
 <style>
-@import url("https://cdn.jsdelivr.net/fontsource/fonts/cairo@latest/arabic-400-normal.css");
-@import url("https://cdn.jsdelivr.net/fontsource/fonts/cairo@latest/arabic-700-normal.css");
-@import url("https://cdn.jsdelivr.net/fontsource/fonts/cairo@latest/arabic-900-normal.css");
-:root{
-  --amber:#ffb52e; --amber2:#ff8c1a; --green:#7ec850; --panel:#1c150dee;
-  --panel2:#241a10ee; --line:#5a442666; --txt:#f5e9d0; --dim:#c9b490;
-  --rc:#9aa4ad;--ru:#4caf50;--rr:#2f9bff;--re:#c05cff;--rl:#ff9800;--rm:#ff4d5e;
-  --sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);
-  --sal:env(safe-area-inset-left,0px);--sar:env(safe-area-inset-right,0px);
+/* ================= BASE ================= */
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { width:100%; height:100%; overflow:hidden; background:#000; color:#fff;
+  font-family:-apple-system,"Segoe UI",Roboto,sans-serif; user-select:none; touch-action:none;
+  overscroll-behavior:none; -webkit-user-select:none; }
+#game-container { position:fixed; inset:0; z-index:0; }
+#game-container canvas { display:block; width:100%; height:100%; }
+
+/* ================= HUD ================= */
+#hud { position:fixed; inset:0; z-index:4; pointer-events:none;
+  padding: calc(env(safe-area-inset-top) + 6px) calc(env(safe-area-inset-right) + 10px) 0 calc(env(safe-area-inset-left) + 10px); }
+#stats { display:flex; gap:8px; flex-wrap:wrap; }
+.stat { background:rgba(0,0,0,0.5); backdrop-filter:blur(6px); padding:6px 12px;
+  border-radius:20px; display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; }
+.stat.money { color:#ffd35c; }
+.stat .icon { font-size:12px; opacity:0.85; }
+.stat.xp { min-width:120px; flex-direction:column; align-items:stretch; padding:5px 12px; }
+#ui-xp-bar { width:100%; height:6px; background:rgba(255,255,255,0.15); border-radius:4px; overflow:hidden; }
+#ui-xp-fill { height:100%; width:0%; background:linear-gradient(90deg,#4ade80,#22d3ee); transition:width 0.3s; }
+#ui-xp-text { font-size:10px; opacity:0.85; margin-top:2px; text-align:center; }
+.stat.stamina { min-width:120px; flex-direction:column; align-items:stretch; padding:5px 12px; }
+#ui-stamina-bar { width:100%; height:6px; background:rgba(255,255,255,0.15); border-radius:4px; overflow:hidden; }
+#ui-stamina-fill { height:100%; width:100%; background:linear-gradient(90deg,#22c55e,#facc15); transition:width 0.15s; }
+#ui-stamina-text { font-size:10px; opacity:0.85; margin-top:2px; text-align:center; }
+
+#tool-indicator { position:absolute; left: calc(env(safe-area-inset-left) + 12px);
+  bottom: calc(env(safe-area-inset-bottom) + 12px); background:rgba(0,0,0,0.55);
+  padding:6px 12px; border-radius:16px; font-size:12px; font-weight:600; }
+#tool-indicator > div:last-child { font-size:11px; opacity:0.8; margin-top:3px; }
+
+#crosshair { position:absolute; top:50%; left:50%; width:6px; height:6px;
+  transform:translate(-50%,-50%); background:rgba(255,255,255,0.75); border-radius:50%;
+  box-shadow:0 0 4px rgba(0,0,0,0.6); transition:transform 0.15s; }
+#crosshair.target { transform:translate(-50%,-50%) scale(1.6); background:#ffd35c; }
+
+#prompt { position:absolute; top:58%; left:50%; transform:translateX(-50%);
+  background:rgba(0,0,0,0.65); padding:8px 16px; border-radius:20px;
+  font-size:13px; font-weight:600; white-space:nowrap; }
+#prompt.hidden { display:none; }
+
+#notifications { position:absolute; top:70px; right:12px;
+  display:flex; flex-direction:column; gap:6px; align-items:flex-end; max-width:60vw; }
+.notif { background:rgba(20,20,20,0.9); padding:8px 14px; border-radius:8px;
+  font-size:12px; font-weight:600; border-left:3px solid #888;
+  animation:slideIn 0.3s ease; }
+.notif.rarity-common { border-color:#bbb; }
+.notif.rarity-uncommon { border-color:#4ade80; }
+.notif.rarity-rare { border-color:#60a5fa; }
+.notif.rarity-epic { border-color:#c084fc; }
+.notif.rarity-legendary { border-color:#fbbf24; box-shadow:0 0 20px rgba(251,191,36,0.5); }
+.notif.rarity-mythic { border-color:#f43f5e; box-shadow:0 0 24px rgba(244,63,94,0.6); }
+@keyframes slideIn { from { opacity:0; transform:translateX(30px); } to { opacity:1; transform:translateX(0); } }
+
+#save-toast { position:absolute; top:70px; left:50%; transform:translateX(-50%);
+  background:rgba(0,0,0,0.8); padding:6px 16px; border-radius:20px;
+  font-size:12px; font-weight:700; color:#ffd35c; transition:opacity 0.4s; }
+#save-toast.hidden { display:none; }
+
+/* ================= DISCOVERY POPUP ================= */
+#discovery { position:absolute; top:32%; left:50%; transform:translate(-50%,-50%);
+  z-index:5; pointer-events:none; }
+#discovery.hidden { display:none; }
+.disc-inner { background:rgba(0,0,0,0.85); padding:18px 32px; border-radius:16px;
+  text-align:center; border:2px solid #fff; min-width:220px; }
+.disc-inner.rarity-rare { border-color:#60a5fa; box-shadow:0 0 40px rgba(96,165,250,0.6); }
+.disc-inner.rarity-epic { border-color:#c084fc; box-shadow:0 0 50px rgba(192,132,252,0.7); }
+.disc-inner.rarity-legendary { border-color:#fbbf24; box-shadow:0 0 60px rgba(251,191,36,0.8); }
+.disc-inner.rarity-mythic { border-color:#f43f5e; box-shadow:0 0 70px rgba(244,63,94,0.9); }
+.disc-icon { font-size:38px; margin-bottom:6px; }
+.disc-title { font-size:11px; letter-spacing:2px; font-weight:800; opacity:0.9; }
+.disc-name { font-size:17px; font-weight:800; margin:6px 0; }
+.disc-val { font-size:12px; color:#4ade80; font-weight:700; }
+#discovery.play .disc-inner { animation:discPop 1.4s ease; }
+@keyframes discPop {
+  0% { transform:scale(0.5); opacity:0; }
+  20% { transform:scale(1.08); opacity:1; }
+  40% { transform:scale(1); }
+  85% { transform:scale(1); opacity:1; }
+  100% { transform:scale(0.95); opacity:0; }
 }
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
-html,body{width:100%;height:100%;overflow:hidden;background:#0d0a06;font-family:'Cairo',system-ui,sans-serif;color:var(--txt);touch-action:none;overscroll-behavior:none}
-canvas{display:block}
-#app{position:fixed;inset:0}
-#app canvas{position:absolute;inset:0;z-index:0}
+body.level-flash::after { content:''; position:fixed; inset:0;
+  background:radial-gradient(circle, rgba(255,211,92,0.4), transparent 70%);
+  pointer-events:none; z-index:100; animation:flash 0.8s ease-out; }
+@keyframes flash { from { opacity:1; } to { opacity:0; } }
 
-/* مساحات اللمس المستقلة لضمان دقة التحكم */
-#controls-layer{position:absolute;inset:0;z-index:2;pointer-events:none}
-#touch-look-zone{position:absolute;top:0;right:0;width:55vw;height:100%;pointer-events:auto;touch-action:none}
-#touch-move-zone{position:absolute;top:0;left:0;width:45vw;height:100%;pointer-events:auto;touch-action:none}
+/* ================= TOUCH LAYER ================= */
+#look-area { position:fixed; inset:0; z-index:1; }
 
-button{font-family:inherit;color:inherit;border:none;background:none;cursor:pointer}
-.hide{display:none!important}
+#joystick { position:fixed; left: calc(env(safe-area-inset-left) + 20px);
+  bottom: calc(env(safe-area-inset-bottom) + 20px); width:130px; height:130px;
+  border-radius:50%; background:rgba(255,255,255,0.08);
+  border:2px solid rgba(255,255,255,0.2); z-index:3; touch-action:none; }
+#joystick-knob { position:absolute; left:50%; top:50%; width:55px; height:55px;
+  border-radius:50%; background:rgba(255,255,255,0.35);
+  transform:translate(-50%,-50%); pointer-events:none; }
 
-/* ---------- HUD ---------- */
-#hud{position:absolute;inset:0;z-index:4;pointer-events:none}
-#hud .chip{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:4px 12px;backdrop-filter:blur(6px);display:flex;align-items:center;gap:8px;font-weight:700}
-#top-bar{position:absolute;top:calc(8px + var(--sat));right:calc(10px + var(--sar));left:calc(10px + var(--sal));display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
-#stat-group{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-#money-chip{color:#ffd76a;font-size:15px}
-#lvl-chip{flex-direction:column;align-items:flex-start;gap:2px;padding:4px 12px;font-size:11px}
-#xp-bar{width:90px;height:5px;background:#0008;border-radius:4px;overflow:hidden}
-#xp-fill{height:100%;width:0%;background:linear-gradient(90deg,#7ec850,#c8ff5e);border-radius:4px;transition:width .3s}
-#stamina-wrap{flex-direction:column;align-items:flex-start;gap:2px;padding:4px 12px;font-size:11px}
-#sta-bar{width:80px;height:6px;background:#0008;border-radius:4px;overflow:hidden}
-#sta-fill{height:100%;width:100%;background:linear-gradient(90deg,#38c8f0,#7ef0ff);border-radius:4px}
-#sta-fill.low{background:linear-gradient(90deg,#ff5b4d,#ff9d5c)}
-#tool-chip{font-size:12px;color:var(--dim)}
-#tool-chip b{color:var(--amber)}
-#menu-col{display:flex;gap:8px;pointer-events:auto}
-.menu-btn{width:42px;height:42px;border-radius:12px;background:var(--panel);border:1px solid var(--line);font-size:18px;display:flex;align-items:center;justify-content:center;position:relative;backdrop-filter:blur(6px)}
-.menu-btn:active{transform:scale(.92);background:var(--panel2)}
-#btn-install{background:linear-gradient(135deg,#ffb52e,#ff8c1a);color:#3a2405;font-weight:900;display:none}
-.badge{position:absolute;top:-3px;left:-3px;width:10px;height:10px;border-radius:50%;background:#ff5252;border:2px solid #1c150d;display:none}
-.badge.on{display:block}
-#crosshair{position:absolute;top:50%;left:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:#ffffffcc;box-shadow:0 0 6px #000a;pointer-events:none}
-#prompt{position:absolute;bottom:calc(160px + var(--sab));left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--amber);color:var(--amber);border-radius:20px;padding:6px 18px;font-weight:700;font-size:13px;display:none;white-space:nowrap;animation:pulse 1.4s infinite;backdrop-filter:blur(6px);pointer-events:none}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 0 #ffb52e55}50%{box-shadow:0 0 0 9px #ffb52e00}}
+#buttons { position:fixed; right: calc(env(safe-area-inset-right) + 16px);
+  bottom: calc(env(safe-area-inset-bottom) + 16px); z-index:3;
+  display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:300px; }
+.tbtn { width:62px; height:62px; border-radius:50%;
+  border:2px solid rgba(255,255,255,0.25); background:rgba(0,0,0,0.45);
+  color:#fff; font-size:22px; font-weight:700; backdrop-filter:blur(4px);
+  touch-action:none; display:flex; align-items:center; justify-content:center;
+  -webkit-user-select:none; user-select:none; }
+.tbtn.primary { background:rgba(255,180,50,0.4); border-color:#ffd35c; font-size:26px; }
+.tbtn:active { transform:scale(0.92); background:rgba(255,255,255,0.25); }
+#btn-action { grid-column:3; grid-row:2; width:72px; height:72px; }
+#btn-jump { grid-column:1; grid-row:1; }
+#btn-sprint { grid-column:2; grid-row:1; }
+#btn-crouch { grid-column:3; grid-row:1; }
+#btn-inv { grid-column:1; grid-row:2; }
+#btn-shop { grid-column:2; grid-row:2; }
 
-/* ---------- أزرار التحكم والـ Joystick المحسّن ---------- */
-#joy-container{position:absolute;bottom:calc(25px + var(--sab));left:calc(25px + var(--sal));width:124px;height:124px;border-radius:50%;background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;pointer-events:none}
-#joy-knob{width:54px;height:54px;border-radius:50%;background:radial-gradient(circle,#ffcf7a,#e69926);box-shadow:0 4px 14px rgba(0,0,0,0.6);border:2px solid #fff;transform:translate(0px,0px);pointer-events:none;will-change:transform}
+#quick-buttons { position:fixed; top: calc(env(safe-area-inset-top) + 70px);
+  right: calc(env(safe-area-inset-right) + 10px); z-index:5;
+  display:flex; flex-direction:column; gap:8px; }
+.qbtn { width:42px; height:42px; border-radius:50%;
+  background:rgba(0,0,0,0.55); border:1.5px solid rgba(255,255,255,0.25);
+  color:#fff; font-size:18px; display:flex; align-items:center;
+  justify-content:center; backdrop-filter:blur(4px); touch-action:none; }
+.qbtn:active { transform:scale(0.9); background:rgba(255,255,255,0.25); }
 
-#btn-cluster{position:absolute;right:calc(16px + var(--sar));bottom:calc(16px + var(--sab));z-index:5;display:flex;gap:12px;align-items:flex-end;pointer-events:auto}
-.cbtn-col{display:flex;flex-direction:column;gap:10px}
-.cbtn{width:56px;height:56px;border-radius:50%;background:rgba(28,21,13,0.88);border:2px solid var(--line);color:var(--txt);font-size:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(6px);touch-action:none}
-.cbtn small{font-size:9px;font-weight:700;opacity:.85}
-.cbtn:active,.cbtn.active{background:rgba(255,181,46,0.3);border-color:var(--amber);transform:scale(.92)}
+/* ================= PANELS ================= */
+#panels { position:fixed; inset:0; z-index:10; pointer-events:none; }
+.panel { position:absolute; inset:0; background:rgba(10,12,16,0.96);
+  backdrop-filter:blur(10px); display:flex; flex-direction:column;
+  pointer-events:auto; animation:fadeIn 0.2s; }
+.panel.hidden { display:none; }
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+.panel-head { display:flex; justify-content:space-between; align-items:center;
+  padding: calc(env(safe-area-inset-top) + 12px) 18px 12px;
+  border-bottom:1px solid rgba(255,255,255,0.1); }
+.panel-head h2 { font-size:19px; }
+.panel-head h2 small { font-size:12px; opacity:0.6; font-weight:500; }
+.close-x { background:rgba(255,255,255,0.1); color:#fff; border:none;
+  width:36px; height:36px; border-radius:50%; font-size:18px;
+  display:flex; align-items:center; justify-content:center; }
+.panel-tabs { display:flex; gap:6px; padding:10px 18px; }
+.tab { flex:1; background:rgba(255,255,255,0.08); color:#ccc; border:none;
+  padding:10px; border-radius:8px; font-weight:600; font-size:13px; }
+.tab.active { background:#ffd35c; color:#1a1a1a; }
+.panel-body { flex:1; overflow-y:auto; padding:12px 18px calc(env(safe-area-inset-bottom) + 20px);
+  -webkit-overflow-scrolling:touch; }
+.empty { text-align:center; opacity:0.5; padding:40px 0; font-size:14px; }
 
-#btn-action{width:76px;height:76px;border-radius:50%;background:linear-gradient(160deg,#ffb52e,#ff8c1a);color:#3a2405;font-size:26px;border:3px solid #ffe0a0;box-shadow:0 6px 18px rgba(0,0,0,0.6);display:flex;flex-direction:column;align-items:center;justify-content:center;touch-action:none;pointer-events:auto}
-#btn-action small{font-size:10px;font-weight:900}
-#btn-action:active{transform:scale(.92)}
+.item-row { display:flex; align-items:center; gap:10px; padding:10px;
+  background:rgba(255,255,255,0.05); border-radius:10px; margin-bottom:8px;
+  border-left:3px solid #555; }
+.item-row .item-icon { width:42px; height:42px; border-radius:8px;
+  background:rgba(255,255,255,0.1); display:flex; align-items:center;
+  justify-content:center; font-size:22px; flex-shrink:0; }
+.item-row .item-info { flex:1; min-width:0; }
+.item-row .item-name { font-size:13px; font-weight:700; }
+.item-row .item-name small { font-size:10px; opacity:0.6; font-weight:500; margin-right:6px; }
+.item-row .item-desc { font-size:11px; opacity:0.65; margin-top:2px; }
+.item-row .item-qty { font-size:13px; font-weight:700; color:#ffd35c; }
+.item-row .row-actions { display:flex; flex-direction:column; gap:4px; flex-shrink:0; }
+.item-action { background:#ffd35c; color:#1a1a1a; border:none;
+  padding:7px 12px; border-radius:8px; font-weight:700; font-size:11px; white-space:nowrap; }
+.item-action.alt { background:#60a5fa; color:#fff; }
+.item-action:disabled { background:#333; color:#666; }
+.rarity-common { border-left-color:#bbb; }
+.rarity-uncommon { border-left-color:#4ade80; }
+.rarity-rare { border-left-color:#60a5fa; }
+.rarity-epic { border-left-color:#c084fc; }
+.rarity-legendary { border-left-color:#fbbf24; }
+.rarity-mythic { border-left-color:#f43f5e; }
 
-/* ---------- بقية القوائم والنوافذ ---------- */
-#tut-bar{position:absolute;top:calc(56px + var(--sat));left:50%;transform:translateX(-50%);z-index:4;background:var(--panel2);border:1px solid var(--amber);border-radius:16px;padding:6px 14px;display:flex;align-items:center;gap:10px;max-width:90vw;backdrop-filter:blur(8px)}
-#tut-text{font-size:12px;font-weight:700}
-#tut-skip{pointer-events:auto;font-size:10px;color:var(--dim);border:1px solid var(--line);border-radius:8px;padding:2px 8px}
-#tut-dots{display:flex;gap:4px}
-#tut-dots i{width:6px;height:6px;border-radius:50%;background:#5a4426}
-#tut-dots i.done{background:var(--amber)}
+.big-btn { width:100%; padding:14px; background:#4ade80; color:#0a1a0f;
+  border:none; border-radius:10px; font-weight:700; font-size:14px; margin-top:10px; }
+.big-btn.danger { background:#f43f5e; color:#fff; }
+.panel label { display:block; margin:14px 0; font-size:14px; }
+.panel input[type="range"] { width:100%; margin-top:8px; }
+.panel input[type="checkbox"] { width:auto; margin-left:8px; }
 
-#toasts{position:absolute;top:calc(90px + var(--sat));left:50%;transform:translateX(-50%);z-index:9;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
-.toast{background:#1c150df0;border:1px solid var(--line);border-radius:14px;padding:6px 16px;font-size:12px;font-weight:700;animation:tin .25s ease;max-width:85vw;text-align:center}
-.toast.gold{border-color:var(--amber);color:var(--amber)}
-.toast.bad{border-color:#ff5252;color:#ff8a80}
-@keyframes tin{from{opacity:0;transform:translateY(-8px)}to{opacity:1}}
+/* ===== SKILLS ===== */
+.skills-head { background:rgba(255,211,92,0.15); padding:10px 14px;
+  border-radius:10px; margin-bottom:12px; font-size:14px; }
+.skills-head b { color:#ffd35c; font-size:18px; }
+.skill-cat { margin-bottom:16px; }
+.skill-cat h3 { font-size:14px; opacity:0.85; margin-bottom:8px;
+  padding-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.1); }
+.skill-row { display:flex; gap:10px; padding:10px;
+  background:rgba(255,255,255,0.05); border-radius:10px;
+  margin-bottom:6px; border-left:3px solid #4ade80; }
+.skill-row.locked { opacity:0.5; border-left-color:#666; }
+.skill-icon { font-size:22px; flex-shrink:0; width:36px; text-align:center; }
+.skill-info { flex:1; min-width:0; }
+.skill-name { font-size:13px; font-weight:700; }
+.skill-name small { opacity:0.6; font-size:11px; margin-right:6px; }
+.skill-desc { font-size:11px; opacity:0.7; margin-top:2px; }
+.skill-req { font-size:10px; color:#fbbf24; margin-top:3px; }
+.skill-buy { background:#c084fc; color:#fff; border:none;
+  padding:8px 12px; border-radius:8px; font-weight:700; font-size:11px;
+  align-self:center; white-space:nowrap; }
+.skill-buy:disabled { background:#333; color:#666; }
 
-#discovery{position:absolute;inset:0;z-index:12;display:flex;align-items:center;justify-content:center;background:#000000aa;opacity:0;pointer-events:none;transition:opacity .3s}
-#discovery.on{opacity:1}
-#disc-card{background:linear-gradient(160deg,#2a1f12,#171009);border:2px solid var(--rc);border-radius:22px;padding:20px 36px;text-align:center;position:relative;overflow:hidden}
-#disc-icon{font-size:50px}
-#disc-rarity{font-size:11px;font-weight:900;letter-spacing:1px}
-#disc-name{font-size:20px;font-weight:900;margin:4px 0}
-#disc-desc{font-size:11px;color:var(--dim)}
+/* ===== MISSIONS ===== */
+.mission-row { background:rgba(255,255,255,0.05); padding:12px;
+  border-radius:10px; margin-bottom:8px; }
+.mission-title { font-size:14px; font-weight:700; margin-bottom:4px; }
+.mission-desc { font-size:12px; opacity:0.7; margin-bottom:8px; }
+.mission-progress { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.mission-progress .bar { flex:1; height:6px; background:rgba(255,255,255,0.15);
+  border-radius:4px; overflow:hidden; }
+.mission-progress .bar .fill { height:100%; background:#4ade80; transition:width 0.3s; }
+.mission-progress span { font-size:11px; opacity:0.8; }
+.mission-reward { display:flex; align-items:center; gap:8px;
+  font-size:12px; font-weight:600; color:#ffd35c; }
+.mission-reward .badge { background:rgba(255,255,255,0.1);
+  padding:4px 10px; border-radius:6px; font-size:11px; color:#fff; margin-right:auto; }
+.mission-reward .badge.wait { opacity:0.6; }
+.mission-reward .item-action { margin-right:auto; }
 
-#modal-root{position:absolute;inset:0;z-index:15;display:none}
-#modal-root.on{display:block}
-#backdrop{position:absolute;inset:0;background:#0009}
-.sheet{position:absolute;right:0;left:0;bottom:0;top:auto;max-height:85vh;background:var(--panel2);border-top:2px solid var(--amber);border-radius:22px 22px 0 0;display:flex;flex-direction:column;animation:sheetUp .28s cubic-bezier(.2,1,.3,1);backdrop-filter:blur(14px);padding-bottom:var(--sab)}
-@keyframes sheetUp{from{transform:translateY(100%)}}
-.sheet-h{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--line)}
-.sheet-h h2{font-size:16px;color:var(--amber)}
-.x-btn{width:36px;height:36px;border-radius:12px;background:#ffffff12;font-size:16px}
-.sheet-b{overflow-y:auto;padding:12px 14px;-webkit-overflow-scrolling:touch}
-.tabs{display:flex;gap:8px;padding:10px 14px 0}
-.tab{flex:1;padding:8px;border-radius:12px;background:#ffffff0d;font-weight:700;font-size:12px;border:1px solid transparent}
-.tab.on{background:#ffb52e22;border-color:var(--amber);color:var(--amber)}
-.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
-.slot{aspect-ratio:1;background:#ffffff0a;border:2px solid #ffffff14;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;font-size:22px}
-.slot .q{position:absolute;bottom:2px;left:5px;font-size:10px;font-weight:900;color:#fff}
-.slot.empty{opacity:.35;font-size:14px}
-.row{display:flex;align-items:center;gap:10px;background:#ffffff08;border:1px solid #ffffff12;border-radius:14px;padding:8px 12px;margin-bottom:8px}
-.row .ic{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;border:2px solid var(--rc)}
-.row .info{flex:1;min-width:0}
-.row .nm{font-weight:900;font-size:12px}
-.row .ds{font-size:11px;color:var(--dim)}
-.row .st{font-size:10px;color:#8fd0ff;margin-top:2px}
-.btn{border-radius:10px;padding:6px 12px;font-weight:900;font-size:11px;background:linear-gradient(160deg,#ffb52e,#ff8c1a);color:#3a2405;white-space:nowrap}
-.btn:active{transform:scale(.95)}
-.btn.alt{background:#ffffff14;color:var(--txt)}
-.btn.grn{background:linear-gradient(160deg,#8ee06a,#4caf50);color:#0d2a08}
-.btn:disabled{opacity:.4;transform:none}
-.pbar{height:6px;background:#0007;border-radius:4px;overflow:hidden;margin-top:4px}
-.pbar i{display:block;height:100%;background:linear-gradient(90deg,var(--amber),#ffd76a)}
-#weight-bar{height:7px;background:#0007;border-radius:4px;overflow:hidden;margin:4px 14px 8px}
-#weight-fill{height:100%;background:linear-gradient(90deg,#8ee06a,#ffd76a);width:0%}
-.wlabel{font-size:11px;color:var(--dim);padding:0 16px}
-.set-row{display:flex;align-items:center;justify-content:space-between;padding:8px 4px;border-bottom:1px solid #ffffff0d;font-size:12px;font-weight:700;gap:8px}
-.set-row input[type=range]{flex:1;accent-color:var(--amber)}
-.set-row select{background:#2a1f12;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-family:inherit}
-.toggle{min-width:70px;padding:6px;border-radius:10px;background:#ffffff12;font-weight:900;font-size:11px;text-align:center}
-.toggle.on{background:#8ee06a33;color:#8ee06a;border:1px solid #8ee06a}
+/* ===== MACHINES ===== */
+.machine-row { background:rgba(255,255,255,0.05); padding:12px;
+  border-radius:10px; margin-bottom:10px; border-left:3px solid #c084fc; }
+.machine-head { font-size:14px; font-weight:700; margin-bottom:6px; }
+.machine-head .mi { font-size:18px; margin-left:6px; }
+.machine-head small { font-size:11px; opacity:0.6; margin-right:6px; }
+.machine-stat { font-size:12px; opacity:0.85; margin-bottom:4px; }
+.machine-row .bar { height:8px; background:rgba(255,255,255,0.15);
+  border-radius:4px; overflow:hidden; margin:6px 0; }
+.machine-row .bar .fill { height:100%; background:linear-gradient(90deg,#c084fc,#22d3ee);
+  transition:width 0.4s; }
+.machine-actions { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
 
-#loading{position:fixed;inset:0;z-index:50;background:radial-gradient(120% 100% at 50% 20%,#3a2a12,#120c06);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
-#logo{width:130px;height:130px;border-radius:28px;box-shadow:0 10px 40px #000a,0 0 0 3px #ffb52e55}
-#loading h1{font-size:30px;font-weight:900;letter-spacing:3px;color:var(--amber)}
-#load-tip{font-size:12px;color:var(--dim);max-width:75vw;text-align:center}
-#load-bar{width:180px;height:6px;background:#ffffff14;border-radius:4px;overflow:hidden}
-#load-fill{height:100%;width:5%;background:linear-gradient(90deg,var(--amber),#ffd76a);transition:width .3s}
-#rotate-hint{display:none;position:fixed;inset:0;z-index:60;background:#120c06f0;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-weight:900;text-align:center;padding:20px}
-#rotate-hint .ph{font-size:52px}
-@media (orientation:portrait) and (pointer:coarse){ #rotate-hint{display:flex} }
-#fps-tag{position:absolute;bottom:calc(4px + var(--sab));left:calc(8px + var(--sal));z-index:4;font-size:10px;color:#ffffff55;pointer-events:none}
+/* ===== STATS ===== */
+.stat-row { display:flex; justify-content:space-between; padding:10px 4px;
+  border-bottom:1px solid rgba(255,255,255,0.06); font-size:13px; }
+.stat-row b { color:#ffd35c; }
+
+/* ===== AREAS ===== */
+.area-row { background:rgba(255,255,255,0.05); padding:12px;
+  border-radius:10px; margin-bottom:8px; border-left:3px solid #4ade80; }
+.area-row.locked { opacity:0.55; border-left-color:#666; }
+.area-head { font-size:14px; font-weight:700; margin-bottom:4px; }
+.area-head small { font-size:11px; opacity:0.6; margin-right:6px; }
+.area-desc { font-size:12px; opacity:0.7; margin-bottom:6px; }
+.area-stats { font-size:11px; opacity:0.65; margin-bottom:8px; }
+
+/* ===== ACHIEVEMENTS ===== */
+.ach-row { display:flex; gap:10px; padding:10px;
+  background:rgba(255,255,255,0.05); border-radius:10px;
+  margin-bottom:6px; border-left:3px solid #666; }
+.ach-row.unlocked { border-left-color:#fbbf24; background:rgba(251,191,36,0.08); }
+.ach-icon { font-size:26px; flex-shrink:0; }
+.ach-info { flex:1; min-width:0; }
+.ach-name { font-size:13px; font-weight:700; }
+.ach-desc { font-size:11px; opacity:0.7; margin:2px 0 6px; }
+.ach-row .bar.small { height:4px; background:rgba(255,255,255,0.15);
+  border-radius:3px; overflow:hidden; }
+.ach-row .bar.small .fill { height:100%; background:#4ade80; }
+.ach-prog { font-size:10px; opacity:0.6; margin-top:3px; }
+.ach-badge { font-size:20px; color:#fbbf24; align-self:center; }
+
+/* ================= TUTORIAL ================= */
+#tutorial { position:fixed; top:38%; left:50%; transform:translate(-50%,-50%);
+  z-index:6; background:rgba(0,0,0,0.8); padding:16px 24px; border-radius:12px;
+  font-size:14px; font-weight:600; text-align:center; max-width:80vw;
+  pointer-events:none; }
+#tutorial.hidden { display:none; }
+
+/* ================= RESPONSIVE ================= */
+@media (max-width: 500px) {
+  .tbtn { width:56px; height:56px; font-size:20px; }
+  #btn-action { width:64px; height:64px; }
+  #joystick { width:110px; height:110px; }
+  #joystick-knob { width:48px; height:48px; }
+  .qbtn { width:38px; height:38px; font-size:16px; }
+  .stat { font-size:12px; padding:5px 10px; }
+  .panel-head h2 { font-size:17px; }
+}
+
+@media (max-height: 420px) {
+  .qbtn { width:34px; height:34px; font-size:14px; }
+  #quick-buttons { top: calc(env(safe-area-inset-top) + 58px); gap:5px; }
+  .tbtn { width:52px; height:52px; font-size:18px; }
+  #btn-action { width:58px; height:58px; }
+  #joystick { width:100px; height:100px; }
+  #joystick-knob { width:44px; height:44px; }
+}
 </style>
 </head>
 <body>
-<div id="app"></div>
 
-<!-- طبقات اللمس المخصصة -->
-<div id="controls-layer">
-  <!-- منطقة حركة الكاميرا (النصف الأيمن) -->
-  <div id="touch-look-zone"></div>
-  <!-- منطقة المشي وعصا التحكم (النصف الأيسر) -->
-  <div id="touch-move-zone"></div>
-</div>
+<div id="game-container"></div>
 
-<!-- عصا التحكم الافتراضية الثابتة -->
-<div id="joy-container">
-  <div id="joy-knob"></div>
-</div>
-
-<!-- أزرار الإجراء والقفز والجري -->
-<div id="btn-cluster">
-  <div class="cbtn-col">
-    <button class="cbtn" id="btn-jump">⤴<small>قفز</small></button>
-    <button class="cbtn" id="btn-sprint">🏃<small>جري</small></button>
-  </div>
-  <button id="btn-action">⛏<small>إزالة</small></button>
-</div>
-
-<!-- HUD -->
 <div id="hud">
-  <div id="top-bar">
-    <div id="menu-col">
-      <button class="menu-btn" id="btn-inv" title="الحقيبة">🎒</button>
-      <button class="menu-btn" id="btn-mis" title="المهام">📜<i class="badge" id="mis-badge"></i></button>
-      <button class="menu-btn" id="btn-set" title="الإعدادات">⚙️</button>
-      <button class="menu-btn" id="btn-install" title="تثبيت التطبيق">📲</button>
+  <div id="stats">
+    <div class="stat money"><span class="icon">$</span><span id="ui-money">50</span></div>
+    <div class="stat"><span class="icon">★</span><span id="ui-level">Lv.1</span></div>
+    <div class="stat xp">
+      <div id="ui-xp-bar"><div id="ui-xp-fill"></div></div>
+      <span id="ui-xp-text">0/100</span>
     </div>
-    <div id="stat-group">
-      <div class="chip" id="tool-chip">🛠 <b id="tool-name">اليدان</b></div>
-      <div class="chip" id="stamina-wrap">⚡ الطاقة <div id="sta-bar"><div id="sta-fill"></div></div></div>
-      <div class="chip" id="lvl-chip">المستوى <span id="lvl-val">1</span><div id="xp-bar"><div id="xp-fill"></div></div></div>
-      <div class="chip" id="money-chip">💰 $<span id="money-val">0</span></div>
+    <div class="stat stamina">
+      <div id="ui-stamina-bar"><div id="ui-stamina-fill"></div></div>
+      <span id="ui-stamina-text">⚡ 100/100</span>
     </div>
   </div>
+
+  <div id="tool-indicator">
+    <div><span id="ui-tool">Bare Hands</span></div>
+    <div id="ui-dur"></div>
+  </div>
+
   <div id="crosshair"></div>
-  <div id="prompt"><span id="prompt-text"></span></div>
+  <div id="prompt" class="hidden"></div>
+  <div id="notifications"></div>
+  <div id="discovery" class="hidden"></div>
+  <div id="save-toast" class="hidden">SAVING...</div>
 </div>
-<div id="fps-tag"></div>
 
-<div id="tut-bar" class="hide">
-  <div id="tut-dots"></div>
-  <div id="tut-text"></div>
-  <button id="tut-skip">تخطي</button>
+<div id="look-area"></div>
+
+<div id="joystick"><div id="joystick-knob"></div></div>
+
+<div id="buttons">
+  <button class="tbtn primary" id="btn-action">⛏</button>
+  <button class="tbtn" id="btn-jump">⤒</button>
+  <button class="tbtn" id="btn-sprint">»</button>
+  <button class="tbtn" id="btn-crouch">⌄</button>
+  <button class="tbtn" id="btn-inv">🎒</button>
+  <button class="tbtn" id="btn-shop">$</button>
 </div>
-<div id="toasts"></div>
 
-<div id="discovery"><div id="disc-card"><div id="disc-icon">🪡</div><div id="disc-rarity"></div><div id="disc-name"></div><div id="disc-desc"></div></div></div>
+<div id="quick-buttons">
+  <button class="qbtn" id="btn-skills">🌟</button>
+  <button class="qbtn" id="btn-missions">📋</button>
+  <button class="qbtn" id="btn-machines">⚙</button>
+  <button class="qbtn" id="btn-areas">🌍</button>
+  <button class="qbtn" id="btn-ach">🏆</button>
+  <button class="qbtn" id="btn-stats">📊</button>
+  <button class="qbtn" id="btn-settings">⚙️</button>
+</div>
 
-<div id="modal-root">
-  <div id="backdrop"></div>
-  <div class="sheet" id="sheet">
-    <div class="sheet-h"><h2 id="sheet-title"></h2><button class="x-btn" id="sheet-close">✕</button></div>
-    <div class="sheet-b" id="sheet-body"></div>
+<div id="panels">
+  <div class="panel hidden" id="panel-inv">
+    <div class="panel-head"><h2>Inventory <small id="ui-inv-count"></small></h2><button class="close-x">✕</button></div>
+    <div class="panel-body" id="inv-list"></div>
+  </div>
+
+  <div class="panel hidden" id="panel-shop">
+    <div class="panel-head"><h2>Shop</h2><button class="close-x">✕</button></div>
+    <div class="panel-tabs">
+      <button class="tab active" data-tab="sell">Sell</button>
+      <button class="tab" data-tab="tools">Tools</button>
+      <button class="tab" data-tab="machines">Machines</button>
+    </div>
+    <div class="panel-body" id="shop-body"></div>
+  </div>
+
+  <div class="panel hidden" id="panel-skills">
+    <div class="panel-head"><h2>Skill Tree</h2><button class="close-x">✕</button></div>
+    <div class="panel-body" id="skills-body"></div>
+  </div>
+
+  <div class="panel hidden" id="panel-missions">
+    <div class="panel-head"><h2>Missions</h2><button class="close-x">✕</button></div>
+    <div class="panel-tabs">
+      <button class="tab active" data-tab="active">Active</button>
+      <button class="tab" data-tab="done">Completed</button>
+    </div>
+    <div class="panel-body" id="missions-body"></div>
+  </div>
+
+  <div class="panel hidden" id="panel-machines">
+    <div class="panel-head"><h2>Machines</h2><button class="close-x">✕</button></div>
+    <div class="panel-body" id="machines-body"></div>
+  </div>
+
+  <div class="panel hidden" id="panel-stats">
+    <div class="panel-head"><h2>Statistics</h2><button class="close-x">✕</button></div>
+    <div class="panel-body" id="stats-body"></div>
+  </div>
+
+  <div class="panel hidden" id="panel-areas">
+    <div class="panel-head"><h2>Areas</h2><button class="close-x">✕</button></div>
+    <div class="panel-body" id="areas-body"></div>
+  </div>
+
+  <div class="panel hidden" id="panel-ach">
+    <div class="panel-head"><h2>Achievements</h2><button class="close-x">✕</button></div>
+    <div class="panel-body" id="ach-body"></div>
+  </div>
+
+  <div class="panel hidden" id="panel-settings">
+    <div class="panel-head"><h2>Settings</h2><button class="close-x">✕</button></div>
+    <div class="panel-body">
+      <label>Sensitivity <input type="range" id="set-sens" min="1" max="20" value="10"></label>
+      <label>FOV <input type="range" id="set-fov" min="55" max="95" value="75"></label>
+      <label><input type="checkbox" id="set-audio" checked> Sound Enabled</label>
+      <button class="big-btn" id="btn-save">Save Game</button>
+      <button class="big-btn danger" id="btn-reset">Reset Progress</button>
+    </div>
   </div>
 </div>
 
-<div id="rotate-hint"><div class="ph">📱</div><div>يُفضَّل اللعب بالوضع الأفقي (Landscape)<br>أدر هاتفك للاستمتاع</div></div>
+<div id="tutorial" class="hidden"><div id="tutorial-text"></div></div>
 
-<div id="loading">
-  <canvas id="logo" width="260" height="260"></canvas>
-  <h1>HAYSTACK</h1>
-  <div id="load-bar"><div id="load-fill"></div></div>
-  <div id="load-tip">جارٍ تهيئة المزرعة ونظام التحكم…</div>
-</div>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
 
-<script async src="https://ga.jspm.io/npm:es-module-shims@1.8.3/dist/es-module-shims.js"></script>
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
 <script type="module">
+/* ==========================================================================
+   HAYSTACK — All Systems Inline
+   ========================================================================== */
 import * as THREE from 'three';
 
-/* ================= [PWA REGISTRATION] ================= */
-let deferredPrompt = null;
-if ('serviceWorker' in navigator && (window.location.protocol.startsWith('http') || window.location.hostname === 'localhost')) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW reg fail:', err));
-  });
-}
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  const b = document.getElementById('btn-install');
-  if (b) b.style.display = 'flex';
-});
-const installBtn = document.getElementById('btn-install');
-if (installBtn) {
-  installBtn.addEventListener('click', async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') installBtn.style.display = 'none';
-      deferredPrompt = null;
-    } else {
-      UI.toast('لتثبيت اللعبة: اضغط على زر المشاركة ثم "إضافة إلى الشاشة الرئيسية"');
-    }
-  });
-}
-
-/* ================= [CORE] helpers ================= */
-const $=id=>document.getElementById(id);
-const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-const lerp=(a,b,t)=>a+(b-a)*t;
-const rnd=(a=1,b)=>b===undefined?Math.random()*a:a+Math.random()*(b-a);
-function mulberry32(s){return function(){s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
-const fmt=n=>n>=1000?(n/1000).toFixed(1)+'k':(''+Math.round(n*10)/10);
-const Bus={m:{},on(e,f){(this.m[e]=this.m[e]||[]).push(f)},emit(e,...a){(this.m[e]||[]).forEach(f=>f(...a))}};
-
-/* ================= [ITEMS] DB ================= */
-const RARITY={common:{n:'شائع',c:'#9aa4ad',xp:15},uncommon:{n:'غير شائع',c:'#4caf50',xp:40},rare:{n:'نادر',c:'#2f9bff',xp:120},epic:{n:'ملحمي',c:'#c05cff',xp:320},legendary:{n:'أسطوري',c:'#ff9800',xp:900},mythic:{n:'خرافي',c:'#ff4d5e',xp:2200}};
-const ITEMS={
- hay:{n:'قش',d:'قش ذهبي جاف. بِعه في منصة البيع.',v:.5,w:.05,r:'common',s:9999,i:'🌾',c:'res'},
- straw:{n:'تبن ناعم',d:'بقايا خفيفة من القش.',v:.12,w:.02,r:'common',s:9999,i:'🍂',c:'res'},
- needle:{n:'إبرة',d:'الإبرة المفقودة! وجدتها.',v:40,w:.01,r:'uncommon',s:99,i:'🪡',c:'rare'},
- needleSilver:{n:'إبرة فضية',d:'إبرة مصنوعة من الفضة الخالصة.',v:260,w:.01,r:'rare',s:99,i:'🪡',c:'rare'},
- needleGold:{n:'إبرة ذهبية',d:'إبرة من الذهب الخالص. نادرة جدًا.',v:1300,w:.02,r:'epic',s:99,i:'🪡',c:'rare'},
- needleRare:{n:'إبرة نادرة',d:'إبرة قديمة بنقوش غامضة.',v:5200,w:.02,r:'legendary',s:99,i:'🪡',c:'rare'},
- needleAncient:{n:'إبرة عتيقة',d:'قطعة أثرية لا تقدّر بثمن.',v:16000,w:.03,r:'mythic',s:99,i:'🪡',c:'rare'},
- needleMystery:{n:'إبرة غامضة',d:'لا أحد يعرف مصدرها…',v:600,w:.01,r:'rare',s:99,i:'🪡',c:'rare'},
- coin:{n:'عملة معدنية',d:'عملة لامعة ضائعة.',v:35,w:.01,r:'common',s:250,i:'🪙',c:'rare'},
- coinOld:{n:'عملة قديمة',d:'عملة أثرية قيمة.',v:180,w:.01,r:'uncommon',s:250,i:'🪙',c:'rare'},
- jewelry:{n:'جوهرة',d:'حجر كريم مفقود.',v:320,w:.05,r:'rare',s:99,i:'💎',c:'rare'},
- ring:{n:'خاتم',d:'خاتم ذهبي فاخر.',v:620,w:.03,r:'rare',s:99,i:'💍',c:'rare'},
- watch:{n:'ساعة قديمة',d:'ساعة جيب عتيقة.',v:480,w:.08,r:'rare',s:99,i:'⌚',c:'rare'},
- treasure:{n:'كنز صغير',d:'صندوق صغير مليء بالمجوهرات!',v:2600,w:.5,r:'legendary',s:20,i:'🧰',c:'rare'},
-};
-const LOOT_TABLE=[
- ['needle',.011,'all'],['needleSilver',.0028,'all'],['needleGold',.0007,'all'],['needleRare',.00014,'all'],
- ['needleAncient',.00003,'all'],['needleMystery',.0001,'all'],['coin',.0035,'metal'],['coinOld',.0012,'metal'],
- ['jewelry',.0006,'metal'],['watch',.0005,'metal'],['ring',.0004,'metal'],['treasure',.00002,'metal'],
-];
-const NEEDLE_IDS=['needle','needleSilver','needleGold','needleRare','needleAncient','needleMystery'];
-
-/* ================= [TOOLS] DB ================= */
-const TOOLS={
- hands:{n:'اليدان',d:'يداكَ العاريتان. البداية المتواضعة.',price:0,cap:1,cd:.55,stam:5,rar:0},
- stick:{n:'عصا خشبية',d:'عصا بسيطة لتحريك القش.',price:25,cap:2,cd:.5,stam:4.5,rar:.08},
- rakeS:{n:'مدمة صغيرة',d:'أول أداة حقيقية للبحث.',price:120,cap:4,cd:.45,stam:4,rar:.2},
- fork:{n:'شوكة قش',d:'تغرس في القش وتقتلع كميات أكبر.',price:420,cap:8,cd:.42,stam:3.5,rar:.35},
- rakeL:{n:'مدمة كبيرة',d:'مدمة عريضة لعمل جاد.',price:1400,cap:15,cd:.4,stam:3,rar:.5},
- shovel:{n:'مجرفة',d:'تجرف القش مجرفة كاملة.',price:3500,cap:25,cd:.45,stam:3,rar:.6},
- magnet:{n:'مغناطيس قوي',d:'يسحب المعادن والأشياء الثمينة من القش.',price:8000,cap:10,cd:.3,stam:2,rar:1.2,metal:1.5},
- vacuum:{n:'مكنسة شفط',d:'تشفط القش بكميات هائلة.',price:18000,cap:60,cd:.35,stam:2.5,rar:.9,metal:1.2},
-};
-
-/* ================= [SAVE] IndexedDB ================= */
-const SaveSys={db:null,ok:false,
- init(){return new Promise(res=>{try{const r=indexedDB.open('haystack-db',1);
-  r.onupgradeneeded=e=>{try{e.target.result.createObjectStore('kv')}catch(_){}};
-  r.onsuccess=e=>{this.db=e.target.result;this.ok=true;res(true)};
-  r.onerror=()=>{this.ok=false;res(false)};r.onblocked=()=>res(false);}catch(e){res(false)}})},
- get(k){return new Promise(res=>{if(this.ok&&this.db){try{const t=this.db.transaction('kv').objectStore('kv').get(k);
-  t.onsuccess=()=>res(t.result??null);t.onerror=()=>res(this.lsGet(k));}catch(e){res(this.lsGet(k))}}else res(this.lsGet(k))})},
- set(k,v){if(this.ok&&this.db){try{const t=this.db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);
-  t.onerror=()=>this.lsSet(k,v);return}catch(e){}}return this.lsSet(k,v)},
- del(k){try{if(this.ok&&this.db)this.db.transaction('kv','readwrite').objectStore('kv').delete(k);localStorage.removeItem('hs-'+k)}catch(e){}},
- lsGet(k){try{return JSON.parse(localStorage.getItem('hs-'+k))}catch(e){return null}},
- lsSet(k,v){try{localStorage.setItem('hs-'+k,JSON.stringify(v));return true}catch(e){return false}}
-};
-
-/* ================= State ================= */
-let S=null;
-function freshState(){return{v:1,money:15,xp:0,inv:{hay:0},tools:{hands:{lvl:0}},equipped:'hands',bagCap:30,bagLvl:0,
- missions:{},stats:{hayRemoved:0,needles:0,earned:0,soldValue:0,toolsBought:0,upgrades:0,found:{},sold:{}},
- piles:{},settings:{sens:1.3,fov:75,quality:'med',audio:true,invert:false},tut:0,pity:0,ts:Date.now()}}
-function xpNeed(l){return Math.round(80*Math.pow(l,1.45))}
-function levelOf(xp){let l=1,need=xpNeed(1);while(xp>=need){xp-=need;l++;need=xpNeed(l)}return{l,left:xp,need}}
-function effTool(){const id=S.equipped,t=TOOLS[id],lvl=(S.tools[id]||{}).lvl||0;
- return{id,lvl,name:t.n,cap:Math.round(t.cap*(1+.3*lvl)),cd:t.cd*Math.pow(.92,lvl),stam:t.stam,rar:t.rar+.15*lvl,metal:t.metal||1}}
-function upCost(id){const t=TOOLS[id],lvl=(S.tools[id]||{}).lvl||0;return Math.round(t.price*.6*(lvl+1))}
-function bagCost(){return Math.round(150*Math.pow(1.8,S.bagLvl))}
-function invWeight(){let w=0;for(const k in S.inv)w+=(ITEMS[k]?.w||0)*S.inv[k];return w}
-function invAdd(id,q){const it=ITEMS[id];if(!it)return 0;const room=Math.floor((S.bagCap-invWeight())/it.w);const add=Math.min(q,Math.max(0,room));
- if(add>0){S.inv[id]=(S.inv[id]||0)+add;Bus.emit('inv')}return add}
-let saveTimer=null;function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(saveNow,1500)}
-async function saveNow(){if(!S)return;S.ts=Date.now();
- for(const p of Hay.piles)S.piles[p.def.id]=p.def.n-(p.aliveCount);
- await SaveSys.set('save',JSON.parse(JSON.stringify(S)));Bus.emit('saved')}
-
-/* ================= [AUDIO] ================= */
-const AudioSys={ctx:null,master:null,on:true,noiseBuf:null,stepT:0,
- ensure(){if(this.ctx){if(this.ctx.state==='suspended')this.ctx.resume();return}
-  try{this.ctx=new(window.AudioContext||window.webkitAudioContext)();this.master=this.ctx.createGain();
-  this.master.gain.value=.5;this.master.connect(this.ctx.destination);
-  const b=this.ctx.createBuffer(1,this.ctx.sampleRate*1.5,this.ctx.sampleRate),d=b.getChannelData(0);
-  for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;this.noiseBuf=b;this.ambient();}catch(e){}},
- env(g,t0,a,peak,d){g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(peak,t0+a);g.gain.exponentialRampToValueAtTime(.0001,t0+a+d)},
- osc(type,f0,f1,t0,dur,vol){if(!this.ctx||!this.on)return;const o=this.ctx.createOscillator(),g=this.ctx.createGain();
-  o.type=type;o.frequency.setValueAtTime(f0,t0);if(f1)o.frequency.exponentialRampToValueAtTime(f1,t0+dur);
-  this.env(g,t0,.008,vol,dur);o.connect(g);g.connect(this.master);o.start(t0);o.stop(t0+dur+.05)},
- noise(t0,dur,vol,ftype,freq,q=1){if(!this.ctx||!this.on)return;const s=this.ctx.createBufferSource();s.buffer=this.noiseBuf;
-  const f=this.ctx.createBiquadFilter();f.type=ftype;f.frequency.value=freq;f.Q.value=q;const g=this.ctx.createGain();
-  this.env(g,t0,.01,vol,dur);s.connect(f);f.connect(g);g.connect(this.master);s.start(t0);s.stop(t0+dur+.1)},
- step(run){if(!this.ctx||!this.on)return;const t=this.ctx.currentTime;this.noise(t,.07,run?.09:.055,'lowpass',420+Math.random()*220)},
- hay(){if(!this.ctx||!this.on)return;const t=this.ctx.currentTime;this.noise(t,.16,.22,'lowpass',750+Math.random()*250,.7);this.noise(t,.09,.1,'highpass',2600)},
- swing(){if(!this.ctx||!this.on)return;const t=this.ctx.currentTime;this.noise(t,.12,.08,'bandpass',900,2)},
- pickup(r){if(!this.ctx||!this.on)return;const t=this.ctx.currentTime;this.osc('sine',660,990,t,.09,.12);
-  if(r!=='common'){this.osc('sine',880,1320,t+.08,.12,.12)}},
- coin(){if(!this.ctx||!this.on)return;const t=this.ctx.currentTime;this.osc('triangle',1200,1150,t,.07,.14);this.osc('triangle',1650,1600,t+.06,.09,.12)},
- buy(){if(!this.ctx||!this.on)return;const t=this.ctx.currentTime;this.osc('triangle',520,780,t,.1,.15);this.osc('triangle',780,1160,t+.1,.14,.15)},
- sell(){if(!this.ctx||!this.on)return;const t=this.ctx.currentTime;this.osc('square',880,880,t,.05,.06);this.osc('square',1174,1174,t+.07,.07,.06)},
- fanfare(){if(!this.ctx||!this.on)return;const t=this.ctx.currentTime;[523,659,784,1046,1318].forEach((f,i)=>this.osc('triangle',f,f,t+i*.09,.22,.14))},
- levelup(){if(!this.ctx||!this.on)return;const t=this.ctx.currentTime;this.osc('sawtooth',300,900,t,.35,.1);this.osc('triangle',600,1200,t+.15,.3,.1)},
- deny(){if(!this.ctx||!this.on)return;const t=this.ctx.currentTime;this.osc('square',220,160,t,.15,.08)},
- ambient(){if(!this.ctx)return;const s=this.ctx.createBufferSource();s.buffer=this.noiseBuf;s.loop=true;
-  const f=this.ctx.createBiquadFilter();f.type='lowpass';f.frequency.value=280;const g=this.ctx.createGain();g.gain.value=.035;
-  const lfo=this.ctx.createOscillator(),lg=this.ctx.createGain();lfo.frequency.value=.13;lg.gain.value=.02;
-  lfo.connect(lg);lg.connect(g.gain);s.connect(f);f.connect(g);g.connect(this.master);s.start();lfo.start();
-  const birds=()=>{if(this.on&&this.ctx&&Math.random()<.6){const t=this.ctx.currentTime,base=2400+Math.random()*1400;
-   for(let i=0;i<2+Math.random()*3;i++)this.osc('sine',base,base*(1.1+Math.random()*.3),t+i*.12,.07,.03)}
-   setTimeout(birds,2500+Math.random()*5000)};setTimeout(birds,3000)}
-};
-
-/* ================= [UI] toasts / HUD ================= */
-const UI={modalOpen:false,
- toast(msg,cls=''){const t=document.createElement('div');t.className='toast '+cls;t.textContent=msg;$('toasts').appendChild(t);
-  setTimeout(()=>{t.style.opacity=0;t.style.transition='opacity .4s';setTimeout(()=>t.remove(),400)},2400)},
- hud(){ $('money-val').textContent=fmt(S.money);const L=levelOf(S.xp);$('lvl-val').textContent=L.l;
-  $('xp-fill').style.width=(100*L.left/L.need)+'%';const tt=effTool();$('tool-name').textContent=tt.name+' · سعة '+tt.cap},
- stamina(){const f=$('sta-fill');f.style.width=Player.stamina+'%';f.classList.toggle('low',Player.stamina<25)},
- discovery(it){const R=RARITY[it.r];const card=$('disc-card');card.style.borderColor=R.c;card.style.color=R.c;
-  $('disc-icon').textContent=it.i;$('disc-icon').style.color=R.c;$('disc-rarity').textContent=R.n;$('disc-rarity').style.color=R.c;
-  $('disc-name').style.color='#fff';$('disc-name').textContent=it.n;$('disc-desc').textContent=it.d+' — $'+it.v;
-  $('discovery').classList.add('on');setTimeout(()=>$('discovery').classList.remove('on'),2600)},
- prompt(txt){const p=$('prompt');if(txt){$('prompt-text').textContent=txt;p.style.display='block'}else p.style.display='none'}
-};
-Bus.on('money',()=>UI.hud());Bus.on('xp',()=>UI.hud());Bus.on('inv',()=>{UI.hud();scheduleSave()});
-
-/* ================= Three core ================= */
-const QUALITY={low:{dpr:1,shadow:false,ss:1024,pieces:420,parts:80,grass:500},med:{dpr:1.5,shadow:true,ss:1024,pieces:720,parts:160,grass:1100},high:{dpr:2,shadow:true,ss:2048,pieces:980,parts:240,grass:1900}};
-let renderer,scene,camera,sun,hemi;
-const appEl=$('app');
-function initThree(){
- renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
- renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;
- renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.toneMapping=THREE.ACESFilmicToneMapping;
- appEl.appendChild(renderer.domElement);
- scene=new THREE.Scene();
- const sky=document.createElement('canvas');sky.width=2;sky.height=256;const sg=sky.getContext('2d');
- const gr=sg.createLinearGradient(0,0,0,256);gr.addColorStop(0,'#4a9fe8');gr.addColorStop(.55,'#9ccbee');gr.addColorStop(.8,'#e8f0e2');gr.addColorStop(1,'#f2e9c8');
- sg.fillStyle=gr;sg.fillRect(0,0,2,256);const st=new THREE.CanvasTexture(sky);st.colorSpace=THREE.SRGBColorSpace;scene.background=st;
- scene.fog=new THREE.Fog(0xdfe8dc,55,170);
- camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,400);camera.rotation.order='YXZ';camera.position.set(0,1.62,20);
- hemi=new THREE.HemisphereLight(0xbdd7f0,0x6b7a4a,.95);scene.add(hemi);
- sun=new THREE.DirectionalLight(0xfff0d0,1.6);sun.position.set(38,58,18);sun.castShadow=true;
- sun.shadow.mapSize.set(2048,2048);const sc=sun.shadow.camera;sc.left=-55;sc.right=55;sc.top=55;sc.bottom=-55;sc.near=10;sc.far=160;
- sun.shadow.bias=-.0004;scene.add(sun);
- addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
-}
-
-/* ================= procedural textures ================= */
-const TX={};
-function canvasTex(size,draw,rep=1){const c=document.createElement('canvas');c.width=c.height=size;draw(c.getContext('2d'),size);
- const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rep,rep);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return t}
-function makeTextures(){
- TX.grass=canvasTex(256,(g,s)=>{g.fillStyle='#79a257';g.fillRect(0,0,s,s);
-  for(let i=0;i<2600;i++){const x=Math.random()*s,y=Math.random()*s,h=68+Math.random()*30,l=30+Math.random()*22;
-   g.strokeStyle=`hsl(${h},42%,${l}%)`;g.lineWidth=1;g.beginPath();g.moveTo(x,y);g.lineTo(x+rnd(-2,2),y-rnd(2,5));g.stroke()}
-  for(let i=0;i<40;i++){g.fillStyle=`rgba(120,95,60,${.05+Math.random()*.08})`;g.beginPath();
-   g.arc(Math.random()*s,Math.random()*s,rnd(6,26),0,7);g.fill()}},26);
- TX.hay=canvasTex(128,(g,s)=>{g.fillStyle='#d3a94e';g.fillRect(0,0,s,s);
-  for(let i=0;i<600;i++){const x=Math.random()*s,y=Math.random()*s,a=Math.random()*Math.PI;
-   g.strokeStyle=`hsl(${38+Math.random()*14},${55+Math.random()*25}%,${42+Math.random()*30}%)`;g.lineWidth=1.4;
-   g.beginPath();g.moveTo(x,y);g.lineTo(x+Math.cos(a)*rnd(6,18),y+Math.sin(a)*rnd(6,18));g.stroke()}});
- TX.wood=canvasTex(128,(g,s)=>{g.fillStyle='#8a5a33';g.fillRect(0,0,s,s);
-  for(let i=0;i<s;i+=7){g.fillStyle=`rgba(${60+Math.random()*50},${35+Math.random()*25},15,${.25+Math.random()*.3})`;g.fillRect(0,i,s,4)}
-  for(let i=0;i<20;i++){g.strokeStyle='rgba(40,20,8,.5)';g.beginPath();const y=Math.random()*s;g.moveTo(0,y);g.lineTo(s,y+rnd(-6,6));g.stroke()}},2);
- TX.roof=canvasTex(128,(g,s)=>{g.fillStyle='#6e3b2a';g.fillRect(0,0,s,s);
-  for(let y=0;y<s;y+=16){g.fillStyle='rgba(0,0,0,.22)';g.fillRect(0,y,s,3);
-   for(let x=(y/16%2)*16;x<s;x+=32){g.fillStyle='rgba(255,255,255,.06)';g.fillRect(x,y,16,16)}}},3);
- TX.cloud=canvasTex(128,(g,s)=>{const r=g.createRadialGradient(s/2,s/2,8,s/2,s/2,s/2);
-  r.addColorStop(0,'rgba(255,255,255,.95)');r.addColorStop(.7,'rgba(255,255,255,.5)');r.addColorStop(1,'rgba(255,255,255,0)');
-  g.fillStyle=r;g.fillRect(0,0,s,s)});
- TX.flare=canvasTex(32,(g,s)=>{const r=g.createRadialGradient(s/2,s/2,1,s/2,s/2,s/2);
-  r.addColorStop(0,'rgba(255,255,255,1)');r.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=r;g.fillRect(0,0,s,s)});
- TX.grassBlade=canvasTex(64,(g,s)=>{g.clearRect(0,0,s,s);for(let i=0;i<9;i++){const x=6+i*6+rnd(-2,2);
-  g.strokeStyle=`hsl(${80+Math.random()*30},48%,${34+Math.random()*22}%)`;g.lineWidth=3;g.beginPath();
-  g.moveTo(x,s);g.quadraticCurveTo(x+rnd(-8,8),s*.5,x+rnd(-10,10),rnd(4,16));g.stroke()}});
-}
-function signTex(text,bg='#7a4a22',fg='#ffe9bd'){const c=document.createElement('canvas');c.width=512;c.height=180;const g=c.getContext('2d');
- g.fillStyle=bg;g.fillRect(0,0,512,180);g.strokeStyle='#3a2410';g.lineWidth=14;g.strokeRect(7,7,498,166);
- g.fillStyle=fg;g.font='900 84px Cairo, sans-serif';g.textAlign='center';g.textBaseline='middle';g.direction='rtl';
- g.fillText(text,256,96);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return t}
-function drawLogo(){const c=$('logo'),g=c.getContext('2d');
- g.fillStyle='#2a1c0c';g.fillRect(0,0,260,260);
- const grd=g.createRadialGradient(130,110,10,130,130,160);grd.addColorStop(0,'#5a4018');grd.addColorStop(1,'#1c1208');
- g.fillStyle=grd;g.fillRect(0,0,260,260);
- g.fillStyle='#e8b93f';g.beginPath();g.moveTo(130,42);g.bezierCurveTo(60,95,50,170,50,195);g.lineTo(210,195);
- g.bezierCurveTo(210,170,200,95,130,42);g.fill();
- g.save();g.translate(170,85);g.rotate(.7);g.fillStyle='#f4f6f8';g.fillRect(-3,-30,6,60);
- g.beginPath();g.arc(0,-30,6,0,Math.PI,true);g.fill();g.restore();}
-
-/* ================= [WORLD] ================= */
-const Colliders=[];
-function addCol(x,z,r){Colliders.push({x,z,r})}
-const PILE_DEFS=[
- {id:'p0',x:0,z:6,R:4.2,H:3.2,seed:11},
- {id:'p1',x:-7,z:-4,R:4.6,H:3.4,seed:22},
- {id:'p2',x:7,z:-9,R:5.2,H:3.8,seed:33},
- {id:'p3',x:-14,z:5,R:4,H:3,seed:44},
- {id:'p4',x:13,z:3,R:4.4,H:3.2,seed:55},
- {id:'p5',x:2,z:-17,R:5,H:3.6,seed:66},
-];
-const ZONES=[
- {id:'sell',x:8,z:14,r:2.7,label:'منصة البيع — بِع ما وجدت',icon:'💰'},
- {id:'shop',x:17,z:-2,r:2.7,label:'المتجر — اشترِ الأدوات',icon:'🛒'},
-];
-function makeMesh(geo,mat,x,y,z,ry=0,shadow=true){const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);m.rotation.y=ry;m.castShadow=shadow;m.receiveShadow=true;scene.add(m);return m}
-function buildWorld(){
- const ground=new THREE.Mesh(new THREE.PlaneGeometry(320,320),new THREE.MeshStandardMaterial({map:TX.grass,roughness:1}));
- ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
- const dirtMat=new THREE.MeshStandardMaterial({color:0x8f7350,roughness:1});
- [[0,0,21],[15,-20,9]].forEach(([x,z,r])=>{const d=new THREE.Mesh(new THREE.CircleGeometry(r,26),dirtMat);
-  d.rotation.x=-Math.PI/2;d.position.set(x,.012,z);d.receiveShadow=true;scene.add(d)});
- const road=new THREE.Mesh(new THREE.PlaneGeometry(6,26),new THREE.MeshStandardMaterial({color:0x97795a,roughness:1}));
- road.rotation.x=-Math.PI/2;road.position.set(0,.02,20);road.receiveShadow=true;scene.add(road);
-
- const postGeo=new THREE.BoxGeometry(.22,1.5,.22),railGeo=new THREE.BoxGeometry(3.05,.12,.08);
- const woodMat=new THREE.MeshStandardMaterial({map:TX.wood,roughness:.9});
- const posts=[],rails=[];const rect={x0:-34,x1:34,z0:-29,z1:29};const step=3;
- for(let x=rect.x0;x<=rect.x1;x+=step){posts.push([x,rect.z0,0]);posts.push([x,rect.z1,0])}
- for(let z=rect.z0;z<=rect.z1;z+=step){posts.push([rect.x0,z,0]);posts.push([rect.x1,z,0])}
- const pm=new THREE.InstancedMesh(postGeo,woodMat,posts.length);const M=new THREE.Matrix4();
- posts.forEach((p,i)=>{M.makeTranslation(p[0],.75,p[1]);pm.setMatrixAt(i,M)});pm.castShadow=true;scene.add(pm);
-
- const trunkGeo=new THREE.CylinderGeometry(.22,.32,2.4,6),leafGeo=new THREE.ConeGeometry(2,4.2,7);
- const trunkMat=new THREE.MeshStandardMaterial({color:0x6e4a2a,roughness:1}),leafMat=new THREE.MeshStandardMaterial({color:0x4a7c38,roughness:1});
- const treePos=[];const rngT=mulberry32(99);
- while(treePos.length<26){const x=rnd(-52,52),z=rnd(-46,46);
-  if(Math.abs(x)<38&&Math.abs(z)<33)continue;if(Math.hypot(x,z)<40&&Math.abs(z-29)<14)continue;treePos.push([x,z])}
- const tm=new THREE.InstancedMesh(trunkGeo,trunkMat,treePos.length),lm=new THREE.InstancedMesh(leafGeo,leafMat,treePos.length);
- treePos.forEach((t,i)=>{const s=.8+rngT()*.9;M.makeScale(s,s,s);M.setPosition(t[0],1.2*s,t[1]);tm.setMatrixAt(i,M);
-  M.makeScale(s,s,s);M.setPosition(t[0],(2.2+2.1)*s*.86,t[1]);lm.setMatrixAt(i,M);addCol(t[0],t[1],.5*s)});
- tm.castShadow=lm.castShadow=true;scene.add(tm,lm);
-
- const barnMat=new THREE.MeshStandardMaterial({map:TX.wood,color:0xc0563d,roughness:.9});
- makeMesh(new THREE.BoxGeometry(11,6,8),barnMat,-22,3,-10,.35);
- const roofMat=new THREE.MeshStandardMaterial({map:TX.roof,roughness:1});
- const r1=makeMesh(new THREE.BoxGeometry(11.8,.3,5.2),roofMat,-22,7.1,-10,.35);r1.rotation.z=.62;r1.position.y=6.9;
- const r2=makeMesh(new THREE.BoxGeometry(11.8,.3,5.2),roofMat,-22,7.1,-10,.35);r2.rotation.z=-.62;r2.position.y=7.9;
- addCol(-22,-10,7.5);
-
- const wsMat=new THREE.MeshStandardMaterial({map:TX.wood,color:0x8a8a92,roughness:.95});
- makeMesh(new THREE.BoxGeometry(6,4,5),wsMat,-18,2,15,-.3);
- const wr=makeMesh(new THREE.BoxGeometry(6.8,.25,5.8),roofMat,-18,4.2,15,-.3);wr.rotation.z=.18;addCol(-18,15,4.4);
-
- const shopMat=new THREE.MeshStandardMaterial({map:TX.wood,color:0xd8a860,roughness:.85});
- makeMesh(new THREE.BoxGeometry(3.4,1.1,1.3),shopMat,18,.55,-6.5);
- [[-1.5,-.5],[1.5,-.5],[-1.5,.5],[1.5,.5]].forEach(p=>makeMesh(new THREE.BoxGeometry(.14,2.6,.14),shopMat,18+p[0],1.3,-6.5+p[1]));
- const awn=makeMesh(new THREE.BoxGeometry(4,.08,2.4),new THREE.MeshStandardMaterial({color:0xc94f3d,roughness:.9}),18,2.62,-6,.12);awn.rotation.x=.16;
- addCol(18,-6.5,2.6);
-
- makeMesh(new THREE.BoxGeometry(4.4,.35,4.4),new THREE.MeshStandardMaterial({map:TX.wood,color:0xc9a05e}),8,.175,14);
- makeMesh(new THREE.BoxGeometry(.9,.5,.9),new THREE.MeshStandardMaterial({color:0x555c66,metalness:.5,roughness:.5}),8,.6,14);
-
- const mkSign=(txt,x,z,ry,bg)=>{const tex=signTex(txt,bg);const m=new THREE.Mesh(new THREE.PlaneGeometry(2.8,.98),new THREE.MeshBasicMaterial({map:tex}));
-  m.position.set(x,2.5,z);m.rotation.y=ry;scene.add(m);makeMesh(new THREE.BoxGeometry(.12,2.5,.12),woodMat,x,1.25,z)};
- mkSign('المتجر',18,-4.2,0,'#28527a');mkSign('منصة البيع',8,16.4,Math.PI,'#2e6b3a');mkSign('الحظيرة',-22,-5,.35);
-
- ZONES.forEach(z=>{const col=z.id==='sell'?0x37d67a:0x3fa9ff;
-  const ring=new THREE.Mesh(new THREE.RingGeometry(z.r-.25,z.r,40),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.5,side:THREE.DoubleSide}));
-  ring.rotation.x=-Math.PI/2;ring.position.set(z.x,.03,z.z);scene.add(ring);
-  const beam=new THREE.Mesh(new THREE.CylinderGeometry(.25,.45,7,12,1,true),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.14,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
-  beam.position.set(z.x,3.5,z.z);scene.add(beam);z.beam=beam});
-
- for(let i=0;i<8;i++){const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:TX.cloud,transparent:true,opacity:.85,depthWrite:false}));
-  sp.position.set(rnd(-120,120),rnd(34,50),rnd(-120,120));sp.scale.set(rnd(16,30),rnd(7,12),1);scene.add(sp);Clouds.push(sp)}
- buildGrass();
-}
-const Clouds=[];let grassMesh=null;
-function buildGrass(){if(grassMesh){scene.remove(grassMesh);grassMesh.geometry.dispose();grassMesh.material.dispose()}
- const q=QUALITY[S.settings.quality];const n=q.grass;
- const geo=new THREE.PlaneGeometry(.5,.46);geo.translate(0,.23,0);
- const mat=new THREE.MeshLambertMaterial({map:TX.grassBlade,alphaTest:.35,side:THREE.DoubleSide});
- grassMesh=new THREE.InstancedMesh(geo,mat,n);const M=new THREE.Matrix4(),Q=new THREE.Quaternion(),E=new THREE.Euler(),P=new THREE.Vector3(),SC=new THREE.Vector3(),C=new THREE.Color();
- const rng=mulberry32(7);let placed=0,guard=0;
- while(placed<n&&guard++<n*4){const x=rnd(-40,40),z=rnd(-36,36);
-  if(PILE_DEFS.some(p=>Math.hypot(x-p.x,z-p.z)<p.R+1))continue;if(Math.abs(x)<3&&z>4)continue;
-  E.set(0,rng()*Math.PI,0);Q.setFromEuler(E);const s=.7+rng()*.9;SC.set(s,s,s);P.set(x,0,z);M.compose(P,Q,SC);
-  grassMesh.setMatrixAt(placed,M);C.setHSL(.24+rng()*.06,.5,.3+rng()*.18);grassMesh.setColorAt(placed,C);placed++}
- grassMesh.count=placed;grassMesh.receiveShadow=true;scene.add(grassMesh)}
-function applyQuality(q){S.settings.quality=q;const p=QUALITY[q];
- renderer.setPixelRatio(Math.min(devicePixelRatio,p.dpr));renderer.setSize(innerWidth,innerHeight);
- renderer.shadowMap.enabled=p.shadow;sun.castShadow=p.shadow;
- Hay.build(p.pieces);buildGrass();Particles.resize(p.parts);scheduleSave()}
-
-/* ================= [HAY] system ================= */
-const Hay={piles:[],mat:null,geo:null,
- build(piecesOverride){this.clear();this.geo=new THREE.BoxGeometry(.07,.55,.07);
-  this.mat=new THREE.MeshLambertMaterial({map:TX.hay});
-  for(const def of PILE_DEFS){const q=QUALITY[S.settings.quality];const n=piecesOverride||q.pieces;
-   const rng=mulberry32(def.seed);const mesh=new THREE.InstancedMesh(this.geo,this.mat,n);
-   const pos=new Float32Array(n*3),alive=new Uint8Array(n).fill(1),M=new THREE.Matrix4(),Q=new THREE.Quaternion(),E=new THREE.Euler(),P=new THREE.Vector3(),SC=new THREE.Vector3(),C=new THREE.Color();
-   for(let i=0;i<n;i++){const rad=def.R*Math.pow(rng(),.6),a=rng()*Math.PI*2;
-    const x=def.x+Math.cos(a)*rad,z=def.z+Math.sin(a)*rad;
-    const hMax=def.H*(1-Math.pow(rad/def.R,2));const y=.06+hMax*Math.pow(rng(),.8);
-    E.set((rng()-.5)*1.3,rng()*Math.PI,(rng()-.5)*1.3);Q.setFromEuler(E);
-    const s=.7+rng()*.75;SC.set(s,s,s);P.set(x,y,z);M.compose(P,Q,SC);mesh.setMatrixAt(i,M);
-    pos[i*3]=x;pos[i*3+1]=y;pos[i*3+2]=z;
-    C.setHSL(.115+rng()*.03,.62,.42+rng()*.2);mesh.setColorAt(i,C)}
-   mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;
-   mesh.castShadow=true;mesh.receiveShadow=true;try{mesh.computeBoundingSphere()}catch(e){mesh.frustumCulled=false}
-   scene.add(mesh);
-   const pile={def,mesh,pos,alive,n,aliveCount:n,order:null};
-   const orng=mulberry32(def.seed*31+7);const ord=[...Array(n).keys()];
-   for(let i=n-1;i>0;i--){const j=Math.floor(orng()*(i+1));[ord[i],ord[j]]=[ord[j],ord[i]]}pile.order=ord;
-   this.piles.push(pile);addCol(def.x,def.z,def.R*.55);
-   const rem=S.piles[def.id]||0;if(rem>0)this.killCount(pile,Math.min(rem,n))}
- },
- killCount(pile,count){const M=new THREE.Matrix4();
-  for(let k=0;k<count&&k<pile.n;k++){const i=pile.order[k];if(!pile.alive[i])continue;pile.alive[i]=0;pile.aliveCount--;
-   M.makeScale(0,0,0);M.setPosition(0,-500,0);pile.mesh.setMatrixAt(i,M)}
-  pile.mesh.instanceMatrix.needsUpdate=true},
- clear(){for(const p of this.piles){scene.remove(p.mesh);p.mesh.dispose()}this.piles.length=0;
-  for(let i=Colliders.length-1;i>=0;i--)if(Colliders[i].hayCol)Colliders.splice(i,1)},
- nearest(x,z,maxD){let best=null,bd=maxD;for(const p of this.piles){const d=Math.hypot(x-p.def.x,z-p.def.z)-p.def.R;if(d<bd){bd=d;best=p}}return best},
- removeAt(pile,point,cap){const r=Math.min(2.3,.55+cap*.06),r2=r*r;const cand=[];
-  for(let i=0;i<pile.n;i++){if(!pile.alive[i])continue;const dx=pile.pos[i*3]-point.x,dy=pile.pos[i*3+1]-point.y,dz=pile.pos[i*3+2]-point.z;
-   const d2=dx*dx+dy*dy+dz*dz;if(d2<r2)cand.push([d2,i])}
-  cand.sort((a,b)=>a[0]-b[0]);const take=cand.slice(0,cap);if(!take.length)return{n:0};
-  const M=new THREE.Matrix4();for(const[,i]of take){pile.alive[i]=0;pile.aliveCount--;
-   M.makeScale(0,0,0);M.setPosition(0,-500,0);pile.mesh.setMatrixAt(i,M)}
-  pile.mesh.instanceMatrix.needsUpdate=true;return{n:take.length}}}
-
-/* ================= [FX] particles / floaters / reticle ================= */
-const Particles={max:160,geo:null,pts:null,pos:null,vel:null,life:null,cols:null,cap:160,
- init(){this.resize(QUALITY[S.settings.quality].parts)},
- resize(cap){this.cap=cap;if(this.pts){scene.remove(this.pts);this.geo.dispose()}
-  this.max=cap;this.pos=new Float32Array(cap*3);this.vel=new Float32Array(cap*3);this.life=new Float32Array(cap);
-  this.cols=new Float32Array(cap*3);this.geo=new THREE.BufferGeometry();
-  this.geo.setAttribute('position',new THREE.BufferAttribute(this.pos,3));
-  this.geo.setAttribute('color',new THREE.BufferAttribute(this.cols,3));
-  const mat=new THREE.PointsMaterial({size:.1,map:TX.flare,vertexColors:true,transparent:true,depthWrite:false});
-  this.pts=new THREE.Points(this.geo,mat);this.pts.frustumCulled=false;scene.add(this.pts);
-  for(let i=0;i<cap;i++)this.pos[i*3+1]=-999},
- burst(p,count,color,spd=2,up=2){const c=new THREE.Color(color);let done=0;
-  for(let i=0;i<this.max&&done<count;i++){if(this.life[i]>0)continue;this.life[i]=rnd(.3,.7);
-   this.pos[i*3]=p.x+rnd(-.15,.15);this.pos[i*3+1]=p.y+rnd(-.1,.15);this.pos[i*3+2]=p.z+rnd(-.15,.15);
-   this.vel[i*3]=rnd(-spd,spd);this.vel[i*3+1]=rnd(.5,up+1.5);this.vel[i*3+2]=rnd(-spd,spd);
-   const v=.75+Math.random()*.25;this.cols[i*3]=c.r*v;this.cols[i*3+1]=c.g*v;this.cols[i*3+2]=c.b*v;done++}},
- update(dt){let any=false;for(let i=0;i<this.max;i++){if(this.life[i]<=0)continue;any=true;this.life[i]-=dt;
-   if(this.life[i]<=0){this.pos[i*3+1]=-999;continue}
-   this.vel[i*3+1]-=7*dt;this.pos[i*3]+=this.vel[i*3]*dt;this.pos[i*3+1]+=this.vel[i*3+1]*dt;this.pos[i*3+2]+=this.vel[i*3+2]*dt;
-   if(this.pos[i*3+1]<0){this.pos[i*3+1]=0;this.vel[i*3+1]*=-.3}}
-  if(any){this.geo.attributes.position.needsUpdate=true;this.geo.attributes.color.needsUpdate=true}}};
-
-const Floaters={pool:[],idx:0,
- init(){for(let i=0;i<6;i++){const sp=new THREE.Sprite(new THREE.SpriteMaterial({transparent:true,depthTest:false}));
-  sp.visible=false;sp.renderOrder=99;scene.add(sp);this.pool.push({sp,t:1})}},
- show(text,color,p){const f=this.pool[this.idx++%this.pool.length];const c=document.createElement('canvas');c.width=512;c.height=110;
-  const g=c.getContext('2d');g.font='900 58px Cairo, sans-serif';g.textAlign='center';g.direction='rtl';
-  g.lineWidth=10;g.strokeStyle='#00000cc';g.strokeText(text,256,72);g.fillStyle=color;g.fillText(text,256,72);
-  if(f.sp.material.map)f.sp.material.map.dispose();f.sp.material.map=new THREE.CanvasTexture(c);f.sp.material.needsUpdate=true;
-  f.sp.position.copy(p);f.sp.position.y+=.5;f.sp.scale.set(2.4,.52,1);f.t=0;f.sp.visible=true},
- update(dt){for(const f of this.pool){if(f.t>=1)continue;f.t+=dt/.9;f.sp.position.y+=dt*.9;
-  f.sp.material.opacity=1-f.t;if(f.t>=1)f.sp.visible=false}}};
-let reticle=null;
-function initReticle(){reticle=new THREE.Mesh(new THREE.RingGeometry(.14,.22,24),new THREE.MeshBasicMaterial({color:0xffb52e,transparent:true,opacity:.9,side:THREE.DoubleSide,depthTest:false}));
- reticle.renderOrder=98;reticle.visible=false;scene.add(reticle)}
-
-/* ================= [ITEMS] pickups ================= */
-const Pickups={list:[],
- spawn(itemId,p){const it=ITEMS[itemId];const g=new THREE.Group();const R=RARITY[it.r];const col=new THREE.Color(R.c);let mesh;
-  if(itemId.startsWith('needle')){mesh=new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,.36,6),new THREE.MeshStandardMaterial({color:itemId==='needleGold'?0xffce4d:itemId==='needleSilver'?0xd8dde2:0xb8bcc2,metalness:.9,roughness:.25,emissive:col,emissiveIntensity:.35}));mesh.rotation.z=Math.PI/2.3}
-  else if(itemId==='coin'||itemId==='coinOld'){mesh=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,.035,16),new THREE.MeshStandardMaterial({color:itemId==='coinOld'?0xb08d57:0xffce4d,metalness:.85,roughness:.3,emissive:col,emissiveIntensity:.25}));mesh.rotation.x=Math.PI/2}
-  else if(itemId==='jewelry'){mesh=new THREE.Mesh(new THREE.IcosahedronGeometry(.11),new THREE.MeshStandardMaterial({color:0x66ccff,metalness:.4,roughness:.1,emissive:col,emissiveIntensity:.5}))}
-  else if(itemId==='ring'){mesh=new THREE.Mesh(new THREE.TorusGeometry(.1,.035,10,20),new THREE.MeshStandardMaterial({color:0xffce4d,metalness:.9,roughness:.2,emissive:col,emissiveIntensity:.3}))}
-  else if(itemId==='watch'){mesh=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,.05,16),new THREE.MeshStandardMaterial({color:0xc0a060,metalness:.8,roughness:.3,emissive:col,emissiveIntensity:.2}))}
-  else if(itemId==='treasure'){mesh=new THREE.Mesh(new THREE.BoxGeometry(.3,.22,.2),new THREE.MeshStandardMaterial({color:0xa06a2c,roughness:.6,emissive:col,emissiveIntensity:.3}))}
-  else{mesh=new THREE.Mesh(new THREE.SphereGeometry(.09,10,8),new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:.4}))}
-  g.add(mesh);if(['epic','legendary','mythic'].includes(it.r)){g.add(new THREE.PointLight(col,2.2,4.5))}
-  g.position.set(p.x+rnd(-.3,.3),Math.max(p.y,.3)+.15,p.z+rnd(-.3,.3));scene.add(g);
-  this.list.push({g,it,id:itemId,t:rnd(0,6),base:g.position.y})},
- update(dt,ppos){for(let i=this.list.length-1;i>=0;i--){const p=this.list[i];p.t+=dt;
-   p.g.rotation.y+=dt*1.6;p.g.position.y=p.base+Math.sin(p.t*2.2)*.08;
-   const d=p.g.position.distanceTo(ppos);
-   if(d<2.6){p.g.position.lerp(ppos.clone().setY(ppos.y-.2),Math.min(1,dt*8))}
-   if(d<1.1){this.collect(i)}}},
- collect(i){const p=this.list[i];scene.remove(p.g);this.list.splice(i,1);
-  const it=p.it,id=p.id;const room=S.bagCap-invWeight();
-  if(room<it.w){UI.toast('حقيبتك ممتلئة! بِع بعض العناصر','bad');AudioSys.deny();this.list.push(p);scene.add(p.g);return}
-  S.inv[id]=(S.inv[id]||0)+1;S.stats.found[id]=(S.stats.found[id]||0)+1;
-  if(NEEDLE_IDS.includes(id)){S.stats.needles++;S.pityDone=true}
-  gainXP(RARITY[it.r].xp);AudioSys.pickup(it.r);
-  Floaters.show('+ '+it.n,RARITY[it.r].c,p.g.position);
-  Particles.burst(p.g.position,10,RARITY[it.r].c,1.6,2);
-  if(['rare','epic','legendary','mythic'].includes(it.r)){UI.discovery(it);AudioSys.fanfare();Player.shake(.18);
-   UI.toast('اكتشاف '+RARITY[it.r].n+'! +$'+it.v,'gold')}
-  Bus.emit('inv');Bus.emit('found',id);scheduleSave()}
-};
-
-/* ================= XP / economy ================= */
-function gainXP(n){const before=levelOf(S.xp).l;S.xp+=n;const after=levelOf(S.xp);
- if(after.l>before.l){const bonus=after.l*15;S.money+=bonus;AudioSys.levelup();Player.shake(.15);
-  UI.toast('🎉 مستوى '+after.l+'! مكافأة $'+bonus,'gold');Bus.emit('money')}
- Bus.emit('xp');scheduleSave()}
-function addMoney(n,fromSell){S.money+=n;if(fromSell)S.stats.earned+=n;Bus.emit('money');scheduleSave()}
-
-/* ================= [PLAYER] + [IMPROVED DUAL-TOUCH CONTROLS] ================= */
-const Player={pos:new THREE.Vector3(0,0,20),vy:0,yaw:0,pitch:0,targetYaw:0,targetPitch:0,
- grounded:true,crouch:false,sprintHeld:false,stamina:100,bobT:0,stepT:0,shakeAmp:0,pitchKick:0,
- fov:75,moveDist:0,lookDist:0,eye(){return this.crouch?.95:1.62},shake(a){this.shakeAmp=Math.max(this.shakeAmp,a)}};
-
-const Input={
- joy:{x:0,y:0,id:null,originX:0,originY:0},
- look:{id:null,lastX:0,lastY:0},
- keys:{},actionHeld:false,sprint:false
-};
-
-function initInput(){
-  const moveZone = $('touch-move-zone');
-  const lookZone = $('touch-look-zone');
-  const knob = $('joy-knob');
-  const joyContainer = $('joy-container');
-
-  // 1. نظام حركة الإبهام الأيسر (Joystick)
-  moveZone.addEventListener('touchstart', (e) => {
-    AudioSys.ensure();
-    if (Input.joy.id !== null) return;
-    const t = e.changedTouches[0];
-    Input.joy.id = t.identifier;
-    const rect = joyContainer.getBoundingClientRect();
-    Input.joy.originX = rect.left + rect.width / 2;
-    Input.joy.originY = rect.top + rect.height / 2;
-    handleJoyMove(t.clientX, t.clientY);
-  }, { passive: false });
-
-  moveZone.addEventListener('touchmove', (e) => {
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      const t = e.changedTouches[i];
-      if (t.identifier === Input.joy.id) {
-        handleJoyMove(t.clientX, t.clientY);
-        break;
-      }
-    }
-  }, { passive: false });
-
-  const releaseJoy = (e) => {
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      if (e.changedTouches[i].identifier === Input.joy.id) {
-        Input.joy.id = null;
-        Input.joy.x = 0;
-        Input.joy.y = 0;
-        knob.style.transform = `translate(0px, 0px)`;
-        break;
-      }
-    }
-  };
-  moveZone.addEventListener('touchend', releaseJoy);
-  moveZone.addEventListener('touchcancel', releaseJoy);
-
-  function handleJoyMove(cx, cy) {
-    const dx = cx - Input.joy.originX;
-    const dy = cy - Input.joy.originY;
-    const dist = Math.hypot(dx, dy);
-    const maxRadius = 42;
-    const clampedDist = Math.min(dist, maxRadius);
-    const angle = Math.atan2(dy, dx);
-
-    const nx = Math.cos(angle) * clampedDist;
-    const ny = Math.sin(angle) * clampedDist;
-    knob.style.transform = `translate(${nx}px, ${ny}px)`;
-
-    // Deadzone خفيفة لمنع الانجراف
-    if (dist < 4) {
-      Input.joy.x = 0;
-      Input.joy.y = 0;
-    } else {
-      Input.joy.x = nx / maxRadius;
-      Input.joy.y = -ny / maxRadius;
+/* ==================== EVENT BUS ==================== */
+class EventBus {
+  constructor() { this.map = new Map(); }
+  on(evt, fn) {
+    if (!this.map.has(evt)) this.map.set(evt, []);
+    this.map.get(evt).push(fn);
+    return () => this.off(evt, fn);
+  }
+  off(evt, fn) {
+    const arr = this.map.get(evt);
+    if (arr) this.map.set(evt, arr.filter(f => f !== fn));
+  }
+  emit(evt, data) {
+    const arr = this.map.get(evt);
+    if (arr) for (const f of arr.slice()) {
+      try { f(data); } catch (e) { console.error('[EventBus]', evt, e); }
     }
   }
+}
 
-  // 2. نظام تدوير الكاميرا الأيمن مع تنعيم فائق
-  lookZone.addEventListener('touchstart', (e) => {
-    AudioSys.ensure();
-    if (Input.look.id !== null) return;
-    const t = e.changedTouches[0];
-    Input.look.id = t.identifier;
-    Input.look.lastX = t.clientX;
-    Input.look.lastY = t.clientY;
-  }, { passive: false });
+/* ==================== ITEMS DB ==================== */
+const RARITIES = {
+  common:    { name: 'Common',    color: '#bbbbbb', mult: 1,   xp: 1 },
+  uncommon:  { name: 'Uncommon',  color: '#4ade80', mult: 3,   xp: 3 },
+  rare:      { name: 'Rare',      color: '#60a5fa', mult: 10,  xp: 10 },
+  epic:      { name: 'Epic',      color: '#c084fc', mult: 30,  xp: 30 },
+  legendary: { name: 'Legendary', color: '#fbbf24', mult: 100, xp: 100 },
+  mythic:    { name: 'Mythic',    color: '#f43f5e', mult: 500, xp: 500 }
+};
 
-  lookZone.addEventListener('touchmove', (e) => {
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      const t = e.changedTouches[i];
-      if (t.identifier === Input.look.id) {
-        const dx = t.clientX - Input.look.lastX;
-        const dy = t.clientY - Input.look.lastY;
-        Input.look.lastX = t.clientX;
-        Input.look.lastY = t.clientY;
+const I = (id, name, desc, value, weight, rarity, stack, sellable, category, icon) =>
+  ({ id, name, desc, value, weight, rarity, stack, sellable, category, icon });
 
-        // حساسية سلسة للكاميرا
-        const sens = 0.0032 * S.settings.sens;
-        Player.targetYaw -= dx * sens;
-        Player.targetPitch = clamp(Player.targetPitch + (S.settings.invert ? 1 : -1) * dy * sens, -1.35, 1.35);
-        Player.lookDist += Math.abs(dx) + Math.abs(dy);
-        break;
-      }
+const ITEMS = {
+  hay:           I('hay',           'Hay',             'Dry cut grass.',          1,   0.5,  'common',    999, true,  'resource', '🌾'),
+  straw:         I('straw',         'Straw',           'Golden straw.',           2,   0.3,  'common',    999, true,  'resource', '🌾'),
+  wood:          I('wood',          'Wood',            'A chunk of wood.',        5,   1.0,  'common',    50,  true,  'resource', '🪵'),
+  cloth:         I('cloth',         'Cloth',           'Torn cloth.',             6,   0.2,  'common',    50,  true,  'resource', '🧵'),
+  rope:          I('rope',          'Rope',            'Old rope.',               8,   0.5,  'uncommon',  50,  true,  'resource', '🪢'),
+  scrap:         I('scrap',         'Scrap Metal',     'Rusty scrap.',            12,  1.0,  'uncommon',  50,  true,  'resource', '⚙'),
+  bottle:        I('bottle',        'Old Bottle',      'Dirty old bottle.',       4,   0.6,  'common',    50,  true,  'object',   '🍾'),
+  button:        I('button',        'Button',          'A lost button.',          3,   0.05, 'common',    50,  true,  'object',   '⚪'),
+  metal:         I('metal',         'Metal Piece',     'Bent metal.',             15,  0.8,  'uncommon',  50,  true,  'object',   '🔩'),
+  key:           I('key',           'Old Key',         'A mysterious key.',       30,  0.05, 'uncommon',  50,  true,  'object',   '🔑'),
+  toy:           I('toy',           'Toy',             'A childs toy.',           22,  0.4,  'uncommon',  50,  true,  'object',   '🧸'),
+  toolPart:      I('toolPart',      'Tool Part',       'A broken tool part.',     40,  1.2,  'rare',      50,  true,  'object',   '🔨'),
+  ring:          I('ring',          'Silver Ring',     'A tarnished ring.',       120, 0.02, 'rare',      50,  true,  'object',   '💍'),
+  watch:         I('watch',         'Old Watch',       'A stopped watch.',        200, 0.1,  'rare',      50,  true,  'object',   '⌚'),
+  silverObj:     I('silverObj',     'Silver Object',   'A silver keepsake.',      350, 0.15, 'epic',      50,  true,  'object',   '🥈'),
+  goldObj:       I('goldObj',       'Gold Object',     'Solid gold.',             900, 0.2,  'epic',      50,  true,  'object',   '🥇'),
+  ancientObj:    I('ancientObj',    'Ancient Object',  'From a lost age.',        2500,0.4,  'legendary', 10,  true,  'object',   '🏺'),
+  treasurePiece: I('treasurePiece', 'Treasure Piece',  'Fragment of treasure.',   6000,0.3,  'legendary', 10,  true,  'object',   '💎'),
+  artifact:      I('artifact',      'Unknown Artifact','Its purpose is lost.',    20000,0.5, 'mythic',    10,  true,  'object',   '🔮'),
+  needle:        I('needle',        'Needle',          'A sewing needle.',        25,  0.01, 'uncommon',  99,  true,  'needle',   '🪡'),
+  silverNeedle:  I('silverNeedle',  'Silver Needle',   'A shiny silver needle.',  150, 0.01, 'rare',      99,  true,  'needle',   '🪡'),
+  coin:          I('coin',          'Old Coin',        'A vintage coin.',         40,  0.02, 'rare',      99,  true,  'object',   '🪙'),
+  goldenNeedle:  I('goldenNeedle',  'Golden Needle',   'A gleaming golden needle.',800,0.01,'epic',      99,  true,  'needle',   '🪡'),
+  ancientNeedle: I('ancientNeedle', 'Ancient Needle',  'An ancient relic.',       5000,0.01,'legendary', 99,  true,  'needle',   '🪡'),
+  mysteryNeedle: I('mysteryNeedle', 'Mystery Needle',  'Nobody knows what it is.',25000,0.01,'mythic',   99,  true,  'needle',   '🪡')
+};
+
+/* ==================== TOOLS ==================== */
+const TOOLS = {
+  hands:     { id:'hands',     tier:0, name:'Bare Hands',     desc:'Slow and primitive.',   baseYield:1,   speed:1.00, maxDur:0,    durCost:0,  stamina:1.0, price:0,      icon:'✋' },
+  stick:     { id:'stick',     tier:1, name:'Wooden Stick',   desc:'A sturdy stick.',       baseYield:3,   speed:1.15, maxDur:120,  durCost:1,  stamina:1.0, price:75,     icon:'🥢' },
+  smallRake: { id:'smallRake', tier:2, name:'Small Rake',     desc:'Metal tines.',          baseYield:8,   speed:1.30, maxDur:250,  durCost:2,  stamina:1.2, price:400,    icon:'🧹' },
+  hayFork:   { id:'hayFork',   tier:3, name:'Hay Fork',       desc:'A big fork.',           baseYield:18,  speed:1.55, maxDur:450,  durCost:3,  stamina:1.5, price:1800,   icon:'🍴' },
+  shovel:    { id:'shovel',    tier:4, name:'Shovel',         desc:'Wide shovel.',          baseYield:35,  speed:1.80, maxDur:700,  durCost:4,  stamina:2.0, price:6500,   icon:'⚒' },
+  mechRake:  { id:'mechRake',  tier:5, name:'Mechanical Rake',desc:'Motorized rake.',       baseYield:80,  speed:2.20, maxDur:1500, durCost:5,  stamina:2.5, price:24000,  icon:'🚜' },
+  vacuum:    { id:'vacuum',    tier:6, name:'Hay Vacuum',     desc:'Industrial suction.',   baseYield:200, speed:2.80, maxDur:3000, durCost:8,  stamina:3.5, price:90000,  icon:'🌀' },
+  scanner:   { id:'scanner',   tier:7, name:'Advanced Scanner',desc:'Deep-scan device.',    baseYield:400, speed:3.50, maxDur:5000, durCost:10, stamina:4.0, price:350000, icon:'📡' }
+};
+const UPGRADE_COST = (basePrice, lvl) => Math.floor(basePrice * 0.5 * Math.pow(1.8, lvl));
+const UPGRADE_MAX = 5;
+
+class ToolSystem {
+  constructor() { this.state = { hands: { owned:true, durability:0, level:1 } }; }
+  get(id) { return TOOLS[id] || TOOLS.hands; }
+  has(id) { return !!this.state[id]?.owned; }
+  getLevel(id) { return this.state[id]?.level || 1; }
+  getDur(id) { return this.state[id]?.durability ?? 0; }
+  getMaxDur(id) {
+    const t = TOOLS[id];
+    if (!t || t.maxDur === 0) return Infinity;
+    return Math.floor(t.maxDur * (1 + (this.getLevel(id) - 1) * 0.15));
+  }
+  getYield(id, toolPowerMult = 1) {
+    const t = TOOLS[id] || TOOLS.hands;
+    const lvlMult = 1 + (this.getLevel(id) - 1) * 0.12;
+    return Math.floor(t.baseYield * lvlMult * toolPowerMult);
+  }
+  buy(id) {
+    if (this.has(id)) return false;
+    const t = TOOLS[id]; if (!t) return false;
+    this.state[id] = { owned:true, durability:t.maxDur, level:1 };
+    return true;
+  }
+  upgrade(id) {
+    const s = this.state[id]; if (!s) return false;
+    if (s.level >= UPGRADE_MAX) return false;
+    s.level++;
+    s.durability = this.getMaxDur(id);
+    return true;
+  }
+  damage(id, amount) {
+    const s = this.state[id]; if (!s || TOOLS[id].maxDur === 0) return;
+    s.durability = Math.max(0, s.durability - amount);
+  }
+  isBroken(id) { return TOOLS[id].maxDur > 0 && this.getDur(id) <= 0; }
+  repair(id) {
+    const s = this.state[id]; if (!s) return 0;
+    const max = this.getMaxDur(id);
+    const missing = max - s.durability;
+    const cost = Math.ceil(missing * 0.5 + TOOLS[id].price * 0.02);
+    s.durability = max;
+    return cost;
+  }
+  serialize() { return JSON.parse(JSON.stringify(this.state)); }
+  deserialize(d) {
+    if (!d || typeof d !== 'object') return;
+    this.state = d;
+    if (!this.state.hands) this.state.hands = { owned:true, durability:0, level:1 };
+  }
+  migrateLegacy(owned) {
+    if (!Array.isArray(owned)) return;
+    for (const id of owned) {
+      if (!this.state[id]) this.state[id] = { owned:true, durability:TOOLS[id]?.maxDur || 0, level:1 };
     }
-  }, { passive: false });
+  }
+}
 
-  const releaseLook = (e) => {
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      if (e.changedTouches[i].identifier === Input.look.id) {
-        Input.look.id = null;
-        break;
-      }
-    }
-  };
-  lookZone.addEventListener('touchend', releaseLook);
-  lookZone.addEventListener('touchcancel', releaseLook);
+/* ==================== SKILLS ==================== */
+const SKILL_CATEGORIES = [
+  { id:'search',   name:'Search',   icon:'🔍' },
+  { id:'tools',    name:'Tools',    icon:'🔧' },
+  { id:'stamina',  name:'Stamina',  icon:'❤' },
+  { id:'economy',  name:'Economy',  icon:'💰' },
+  { id:'luck',     name:'Luck',     icon:'🍀' },
+  { id:'machines', name:'Machines', icon:'⚙' }
+];
 
-  // 3. أزرار العمل والحركة
-  const bind = (id, down, up) => {
-    const b = $(id);
-    b.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      AudioSys.ensure();
-      b.classList.add('active');
-      down && down();
-    }, { passive: false });
-    const end = (e) => {
-      e.preventDefault();
-      b.classList.remove('active');
-      up && up();
+const SKILLS = {
+  searchSpeed:     { cat:'search',  name:'Search Speed',   icon:'⚡', desc:'+10% hay per removal.',   max:5, cost:1, reqLvl:1,  requires:[] },
+  searchPrecision: { cat:'search',  name:'Precision',      icon:'🎯', desc:'+8% item find chance.',   max:5, cost:1, reqLvl:1,  requires:[] },
+  areaSearch:      { cat:'search',  name:'Area Search',    icon:'📐', desc:'+8% removal yield.',      max:5, cost:1, reqLvl:3,  requires:[] },
+  deepSearch:      { cat:'search',  name:'Deep Search',    icon:'⛏', desc:'+1 effective tier.',      max:3, cost:2, reqLvl:6,  requires:['searchSpeed'] },
+  rareDetection:   { cat:'search',  name:'Rare Detection', icon:'💎', desc:'+5% rare-item chance.',   max:5, cost:2, reqLvl:8,  requires:['searchPrecision'] },
+  toolEfficiency:  { cat:'tools',   name:'Efficiency',     icon:'🛠', desc:'-10% durability loss.',   max:5, cost:1, reqLvl:1,  requires:[] },
+  toolSpeed:       { cat:'tools',   name:'Tool Speed',     icon:'⚙', desc:'+8% yield.',              max:5, cost:1, reqLvl:1,  requires:[] },
+  toolPower:       { cat:'tools',   name:'Tool Power',     icon:'💪', desc:'+10% yield.',             max:5, cost:2, reqLvl:5,  requires:['toolSpeed'] },
+  maxStamina:      { cat:'stamina', name:'Max Stamina',    icon:'❤', desc:'+20 max stamina.',        max:5, cost:1, reqLvl:1,  requires:[] },
+  staminaRegen:    { cat:'stamina', name:'Regeneration',   icon:'♻', desc:'+15% regen rate.',        max:5, cost:1, reqLvl:1,  requires:[] },
+  betterPrices:    { cat:'economy', name:'Better Prices',  icon:'$', desc:'+5% sell value.',         max:5, cost:1, reqLvl:1,  requires:[] },
+  discount:        { cat:'economy', name:'Shop Discount',  icon:'🏷', desc:'-5% shop prices.',        max:5, cost:2, reqLvl:5,  requires:['betterPrices'] },
+  rareFind:        { cat:'luck',    name:'Rare Find',      icon:'🍀', desc:'+3% rare chance.',        max:5, cost:2, reqLvl:3,  requires:[] },
+  treasure:        { cat:'luck',    name:'Treasure',       icon:'💰', desc:'+2% legendary chance.',   max:3, cost:3, reqLvl:12, requires:['rareFind'] },
+  machineSpeed:    { cat:'machines',name:'Machine Speed',  icon:'⚙', desc:'+15% machine speed.',     max:5, cost:2, reqLvl:10, requires:[] },
+  machineCapacity: { cat:'machines',name:'Machine Capacity',icon:'📦',desc:'+20% machine storage.',  max:5, cost:2, reqLvl:10, requires:[] }
+};
+
+class SkillTree {
+  constructor() { this.levels = {}; this.points = 0; }
+  getLevel(id) { return this.levels[id] || 0; }
+  canBuy(id, playerLevel) {
+    const s = SKILLS[id]; if (!s) return { ok:false, reason:'Unknown skill.' };
+    if (this.points < s.cost) return { ok:false, reason:'Not enough skill points.' };
+    if (playerLevel < s.reqLvl) return { ok:false, reason:`Requires level ${s.reqLvl}.` };
+    if (this.getLevel(id) >= s.max) return { ok:false, reason:'Maxed.' };
+    for (const r of s.requires) if (this.getLevel(r) < 1) return { ok:false, reason:`Requires ${SKILLS[r].name}.` };
+    return { ok:true };
+  }
+  buy(id, playerLevel) {
+    const c = this.canBuy(id, playerLevel);
+    if (!c.ok) return c;
+    this.points -= SKILLS[id].cost;
+    this.levels[id] = this.getLevel(id) + 1;
+    return { ok:true };
+  }
+  grant(n) { this.points += n; }
+  searchYieldMult()   { return 1 + this.getLevel('searchSpeed') * 0.10 + this.getLevel('areaSearch') * 0.08; }
+  toolYieldMult()     { return 1 + this.getLevel('toolSpeed') * 0.08 + this.getLevel('toolPower') * 0.10; }
+  itemChanceMult()    { return 1 + this.getLevel('searchPrecision') * 0.08; }
+  rareChanceBonus()   { return this.getLevel('rareDetection') * 0.05 + this.getLevel('rareFind') * 0.03; }
+  treasureBonus()     { return this.getLevel('treasure') * 0.02; }
+  effectiveTierBonus(){ return this.getLevel('deepSearch'); }
+  durabilityMult()    { return Math.max(0.3, 1 - this.getLevel('toolEfficiency') * 0.10); }
+  maxStaminaBonus()   { return this.getLevel('maxStamina') * 20; }
+  staminaRegenMult()  { return 1 + this.getLevel('staminaRegen') * 0.15; }
+  sellPriceMult()     { return 1 + this.getLevel('betterPrices') * 0.05; }
+  shopPriceMult()     { return Math.max(0.5, 1 - this.getLevel('discount') * 0.05); }
+  machineSpeedMult()  { return 1 + this.getLevel('machineSpeed') * 0.15; }
+  machineCapMult()    { return 1 + this.getLevel('machineCapacity') * 0.20; }
+  serialize() { return { levels: {...this.levels}, points: this.points }; }
+  deserialize(d) {
+    if (!d) return;
+    this.levels = d.levels || {};
+    this.points = d.points || 0;
+  }
+}
+
+/* ==================== STATISTICS ==================== */
+class Statistics {
+  constructor() { this.data = this.defaults(); }
+  defaults() {
+    return {
+      playTime:0, hayRemoved:0, searches:0, itemsFound:0, itemsSold:0,
+      rareFound:0, epicFound:0, legendaryFound:0, mythicFound:0, needlesFound:0,
+      moneyEarned:0, moneySpent:0, toolsUsed:0, toolsBought:0, machinesBuilt:0,
+      missionsCompleted:0, areasUnlocked:1, xpEarned:0, upgradesApplied:0
     };
-    b.addEventListener('touchend', end);
-    b.addEventListener('touchcancel', end);
-  };
+  }
+  inc(key, n = 1) { this.data[key] = (this.data[key] || 0) + n; }
+  get(key) { return this.data[key] || 0; }
+  serialize() { return { ...this.data }; }
+  deserialize(d) { this.data = { ...this.defaults(), ...(d || {}) }; }
+}
 
-  bind('btn-jump', () => {
-    if (Player.grounded) {
-      Player.vy = 7.6;
-      Player.grounded = false;
-      AudioSys.noise(AudioSys.ctx ? AudioSys.ctx.currentTime : 0, .1, .05, 'lowpass', 500);
+/* ==================== ACHIEVEMENTS ==================== */
+const ACHIEVEMENTS = [
+  { id:'firstFind',   name:'First Find',      icon:'🎁', desc:'Find your first item.',      stat:'itemsFound',       target:1,     reward:{ xp:20,  money:10 } },
+  { id:'firstSale',   name:'First Sale',      icon:'💵', desc:'Sell your first item.',      stat:'itemsSold',        target:1,     reward:{ xp:30,  money:25 } },
+  { id:'firstNeedle', name:'Needle Found',    icon:'🪡', desc:'Find a needle.',             stat:'needlesFound',     target:1,     reward:{ xp:150, money:100, skillPoints:1 } },
+  { id:'lucky',       name:'Lucky',           icon:'🍀', desc:'Find a rare item.',          stat:'rareFound',        target:1,     reward:{ xp:80,  money:50 } },
+  { id:'treasure',    name:'Treasure Hunter', icon:'💎', desc:'Find 100 objects.',          stat:'itemsFound',       target:100,   reward:{ xp:500, money:400 } },
+  { id:'rareX10',     name:'Collector',       icon:'🏆', desc:'Find 10 rare items.',        stat:'rareFound',        target:10,    reward:{ xp:400, money:600 } },
+  { id:'epicX5',      name:'Epic Finder',     icon:'🌟', desc:'Find 5 epic items.',         stat:'epicFound',        target:5,     reward:{ xp:1000,money:1500 } },
+  { id:'legend',      name:'Legendary',       icon:'👑', desc:'Find a legendary item.',     stat:'legendaryFound',   target:1,     reward:{ xp:2000,money:5000, skillPoints:1 } },
+  { id:'rich',        name:'Rich',            icon:'💰', desc:'Earn $10,000 total.',        stat:'moneyEarned',      target:10000, reward:{ xp:600, skillPoints:1 } },
+  { id:'machineOwner',name:'Machine Owner',   icon:'⚙', desc:'Build your first machine.',  stat:'machinesBuilt',    target:1,     reward:{ xp:400, money:300 } },
+  { id:'lvl10',       name:'Rising Star',     icon:'⭐', desc:'Reach level 10.',            stat:'__level',          target:10,    reward:{ money:500, skillPoints:1 } },
+  { id:'lvl25',       name:'Master Searcher', icon:'🥇', desc:'Reach level 25.',            stat:'__level',          target:25,    reward:{ money:5000, skillPoints:2 } }
+];
+
+class AchievementSystem {
+  constructor(game) { this.game = game; this.unlocked = {}; }
+  check() {
+    const stats = this.game.statistics;
+    for (const a of ACHIEVEMENTS) {
+      if (this.unlocked[a.id]) continue;
+      const value = a.stat === '__level' ? this.game.state.level : stats.get(a.stat);
+      if (value >= a.target) this._unlock(a);
     }
-  });
-  bind('btn-sprint', () => Input.sprint = true, () => Input.sprint = false);
-  bind('btn-action', () => { Input.actionHeld = true; doInteract(); }, () => Input.actionHeld = false);
-
-  $('btn-inv').onclick = () => { AudioSys.ensure(); Modals.open('inv'); };
-  $('btn-set').onclick = () => { AudioSys.ensure(); Modals.open('set'); };
-  $('btn-mis').onclick = () => { AudioSys.ensure(); Modals.open('mis'); };
-
-  // خيار لوحة المفاتيح والماوس للكمبيوتر
-  addEventListener('keydown', e => {
-    Input.keys[e.code] = true;
-    AudioSys.ensure();
-    if (e.code === 'Space' && Player.grounded) { Player.vy = 7.6; Player.grounded = false; }
-    if (e.code === 'KeyE') doInteract();
-  });
-  addEventListener('keyup', e => Input.keys[e.code] = false);
-
-  document.addEventListener('contextmenu', e => e.preventDefault());
-  addEventListener('pagehide', () => saveNow());
+  }
+  _unlock(a) {
+    this.unlocked[a.id] = true;
+    const r = a.reward || {};
+    const parts = [];
+    if (r.xp)    { this.game.addXP(r.xp); parts.push(`+${r.xp} XP`); }
+    if (r.money) { this.game.state.money += r.money; parts.push(`+$${r.money}`); }
+    if (r.skillPoints) { this.game.skills.grant(r.skillPoints); parts.push(`+${r.skillPoints} SP`); }
+    this.game.ui.notify(`🏆 ${a.name}: ${parts.join('  ')}`, 'epic');
+    this.game.audio.play('achievement');
+    this.game.ui.refresh();
+  }
+  serialize() { return { ...this.unlocked }; }
+  deserialize(d) { this.unlocked = d || {}; }
 }
 
-/* ================= tool view (hands + tools) ================= */
-const Hands={root:null,anim:0,animDur:.4,animOn:false,
- build(){if(this.root)camera.remove(this.root);this.root=new THREE.Group();
-  const skin=new THREE.MeshStandardMaterial({color:0xd9a377,roughness:.8});
-  const sleeve=new THREE.MeshStandardMaterial({color:0x5a6b4a,roughness:.9});
-  const mkArm=x=>{const g=new THREE.Group();const a=new THREE.Mesh(new THREE.BoxGeometry(.09,.09,.34),sleeve);a.position.z=-.05;
-   const h=new THREE.Mesh(new THREE.BoxGeometry(.085,.085,.1),skin);h.position.z=-.26;g.add(a,h);g.position.set(x,-.06,0);return g};
-  this.root.add(mkArm(-.14),mkArm(.14));
-  this.toolG=new THREE.Group();this.toolG.position.set(.14,-.05,-.28);this.root.add(this.toolG);
-  this.root.position.set(.26,-.34,-.48);camera.add(this.root);this.setTool(S.equipped)},
- setTool(id){this.toolG.clear();const wood=new THREE.MeshStandardMaterial({color:0x8a5a33,roughness:.9});
-  const metal=new THREE.MeshStandardMaterial({color:0x9aa2aa,metalness:.7,roughness:.35});let g=this.toolG;
-  const handle=len=>{const h=new THREE.Mesh(new THREE.CylinderGeometry(.022,.028,len,8),wood);h.rotation.x=Math.PI/2*.85;g.add(h);return h};
-  if(id==='stick'){handle(.7)}
-  else if(id==='rakeS'||id==='rakeL'){const w=id==='rakeL'?.34:.22;handle(.85);
-   const bar=new THREE.Mesh(new THREE.BoxGeometry(w,.03,.03),metal);bar.position.set(0,.02,-.4);g.add(bar);
-   for(let i=0;i<(id==='rakeL'?7:5);i++){const t=new THREE.Mesh(new THREE.BoxGeometry(.015,.12,.015),metal);
-    t.position.set(-w/2+i*(w/(id==='rakeL'?6:4)),.02,-.43);g.add(t)}}
-  else if(id==='fork'){handle(.85);for(let i=-1;i<=1;i++){const t=new THREE.Mesh(new THREE.CylinderGeometry(.012,.008,.3,6),metal);
-   t.rotation.x=.5;t.position.set(i*.06,.06,-.44);g.add(t)}}
-  else if(id==='shovel'){handle(.8);const b=new THREE.Mesh(new THREE.BoxGeometry(.16,.02,.2),metal);b.position.set(0,.02,-.44);b.rotation.x=.4;g.add(b)}
-  else if(id==='magnet'){const red=new THREE.MeshStandardMaterial({color:0xd33,metalness:.5,roughness:.4});
-   const u=new THREE.Mesh(new THREE.TorusGeometry(.08,.03,8,14,Math.PI),red);u.position.set(0,.05,-.32);u.rotation.z=Math.PI;g.add(u);
-   handle(.3)}
-  else if(id==='vacuum'){const body=new THREE.Mesh(new THREE.BoxGeometry(.14,.16,.3),new THREE.MeshStandardMaterial({color:0xc86432,roughness:.6}));
-   body.position.set(0,.02,-.3);g.add(body);const tube=new THREE.Mesh(new THREE.CylinderGeometry(.035,.05,.3,8),metal);
-   tube.rotation.x=1.2;tube.position.set(0,0,-.46);g.add(tube)}
-  else{
-   const f=new THREE.Mesh(new THREE.BoxGeometry(.06,.05,.07),new THREE.MeshStandardMaterial({color:0xd9a377}));f.position.set(0,0,-.05);g.add(f)}},
- swing(){this.animOn=true;this.anim=0;AudioSys.swing()},
- update(dt,spd){if(!this.root)return;if(this.animOn){this.anim+=dt/this.animDur;
-   if(this.anim>=1){this.animOn=false;this.anim=0}}
-  const t=this.anim,k=Math.sin(Math.min(1,t)*Math.PI);
-  this.root.rotation.x=-k*.95+Math.sin(Player.bobT)*.02*spd;
-  this.root.position.z=-.48+k*.12;this.root.position.y=-.34+Math.abs(Math.sin(Player.bobT))*.012*spd+k*.03;
-  this.root.position.x=.26+Math.sin(Player.bobT*.5)*.008*spd}};
-
-/* ================= interactions ================= */
-let hover=null,raycaster=new THREE.Raycaster(),hoverTimer=0;
-raycaster.far=7;
-function updateHover(dt){hoverTimer-=dt;
- if(UI.modalOpen){UI.prompt(null);if(reticle)reticle.visible=false;return}
- let zone=null;for(const z of ZONES){if(Math.hypot(Player.pos.x-z.x,Player.pos.z-z.z)<z.r)zone=z}
- if(zone&&hoverTimer<=0){hover={type:'zone',zone};UI.prompt(zone.icon+' '+zone.label+' — اضغط ⛏');if(reticle)reticle.visible=false;return}
- if(hoverTimer>0){if(hover&&hover.type==='hay')UI.prompt('⛏ إزالة القش (سعة '+effTool().cap+')');return}
- hoverTimer=.12;
- const near=Hay.nearest(Player.pos.x,Player.pos.z,4.5);
- if(!near||near.aliveCount===0){hover=null;UI.prompt(null);if(reticle)reticle.visible=false;return}
- const dir=new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(Player.pitch,Player.yaw,0,'YXZ'));
- raycaster.set(camera.position,dir);
- const hits=raycaster.intersectObject(near.mesh,false);
- const hit=hits.find(h=>near.alive[h.instanceId]);
- if(hit&&hit.distance<4.2){hover={type:'hay',pile:near,point:hit.point.clone()};
-  UI.prompt('⛏ إزالة القش (سعة '+effTool().cap+')');
-  if(reticle){reticle.visible=true;reticle.position.copy(hit.point).addScaledVector(dir,-.05);reticle.quaternion.copy(camera.quaternion)}}
- else{hover=null;UI.prompt(null);if(reticle)reticle.visible=false}}
-let actionCd=0;
-function doInteract(){if(UI.modalOpen)return;updateHover(1);if(!hover)return;
- if(hover.type==='zone'){Modals.open(hover.zone.id==='sell'?'sell':'shop');return}
- if(hover.type==='hay')tryRemove(hover)}
-function tryRemove(h){const tool=effTool();
- if(actionCd>0)return;
- if(Player.stamina<tool.stam){UI.toast('أنت مرهق! استرح قليلًا','bad');AudioSys.deny();return}
- const space=S.bagCap-invWeight();
- if(space<ITEMS.hay.w){UI.toast('الحقيبة ممتلئة! بِع القش في منصة البيع 💰','bad');AudioSys.deny();return}
- const pile=h.pile;
- const dir=new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(Player.pitch,Player.yaw,0,'YXZ'));
- raycaster.set(camera.position,dir);const hits=raycaster.intersectObject(pile.mesh,false);
- const hit=hits.find(x=>pile.alive[x.instanceId]);const point=hit?hit.point:h.point;
- const res=Hay.removeAt(pile,point,tool.cap);
- if(res.n===0)return;
- actionCd=tool.cd;Player.stamina=Math.max(0,Player.stamina-tool.stam);
- Hands.swing();AudioSys.hay();Player.pitchKick=-.012;Player.shake(.02);
- Particles.burst(point,Math.min(14,6+res.n),0xd8b25a,1.8,2.2);
- const added=invAdd('hay',res.n);
- S.stats.hayRemoved+=res.n;gainXP(Math.ceil(res.n/2));
- const strawN=Math.round(res.n*.12);if(strawN>0)invAdd('straw',strawN);
- if(added<res.n)UI.toast('الحقيبة امتلأت أثناء الجمع!','bad');
- rollLoot(pile,res.n,point,tool);
- Bus.emit('inv');Bus.emit('stat');scheduleSave()}
-function chancePerPiece(p,n){return 1-Math.pow(1-p,n)}
-function rollLoot(pile,n,point,tool){let drops=0;
- if(pile.def.id==='p0'&&!S.pityDone){S.pity+=n;
-  if(S.pity>=30){S.pityDone=true;Pickups.spawn('needle',point);return}}
- for(const[id,p,tag]of LOOT_TABLE){if(drops>=3)break;
-  let pp=p*(1+tool.rar);if(tag==='metal')pp*=tool.metal;
-  if(Math.random()<chancePerPiece(pp,n)){Pickups.spawn(id,point);drops++}}}
-
-/* ================= [MISSIONS] ================= */
-const MISSIONS=[
- {id:'m1',n:'إزالة القش',d:'أزل 50 قطعة قش بيديك',t:50,g:()=>S.stats.hayRemoved,rw:{money:20}},
- {id:'m2',n:'الإبرة الأولى',d:'اعثر على أول إبرة داخل القش',t:1,g:()=>S.stats.needles,rw:{money:50}},
- {id:'m3',n:'عامل قش',d:'اجمع 150 قطعة قش',t:150,g:()=>S.stats.hayRemoved,rw:{money:40}},
- {id:'m4',n:'البائع الأول',d:'بِع عناصر بقيمة $100',t:100,g:()=>Math.round(S.stats.soldValue),rw:{money:60}},
- {id:'m5',n:'أداتك الأولى',d:'اشترِ أداة من المتجر',t:1,g:()=>S.stats.toolsBought,rw:{money:40}},
- {id:'m6',n:'التاجر',d:'اجمع $500 من البيع',t:500,g:()=>Math.round(S.stats.soldValue),rw:{money:100}},
- {id:'m7',n:'التطوير',d:'قم بترقية أي أداة',t:1,g:()=>S.stats.upgrades,rw:{money:80}},
+/* ==================== MISSIONS ==================== */
+const MISSIONS = [
+  { id:'m_firstHay', title:'First Harvest',  desc:'Remove 20 hay.',            stat:'hayRemoved',      target:20,    reward:{ xp:30,  money:20 } },
+  { id:'m_hay500',   title:'Bale Buster',    desc:'Remove 500 hay.',           stat:'hayRemoved',      target:500,   reward:{ xp:200, money:150 } },
+  { id:'m_hay5000',  title:'Hay Master',     desc:'Remove 5,000 hay.',         stat:'hayRemoved',      target:5000,  reward:{ xp:1000,money:1200 } },
+  { id:'m_items10',  title:'Collector',      desc:'Find 10 items.',            stat:'itemsFound',      target:10,    reward:{ xp:100, money:80 } },
+  { id:'m_items100', title:'Treasurer',      desc:'Find 100 items.',           stat:'itemsFound',      target:100,   reward:{ xp:600, money:500 } },
+  { id:'m_sell200',  title:'Merchant',       desc:'Sell $200 worth.',          stat:'moneyEarned',     target:200,   reward:{ xp:120, money:30 } },
+  { id:'m_sell5000', title:'Big Business',   desc:'Earn $5,000 total.',        stat:'moneyEarned',     target:5000,  reward:{ xp:800, money:300 } },
+  { id:'m_rare5',    title:'Rare Finds',     desc:'Find 5 rare items.',        stat:'rareFound',       target:5,     reward:{ xp:500, money:400 } },
+  { id:'m_needle',   title:'Found It!',      desc:'Find a needle.',            stat:'needlesFound',    target:1,     reward:{ xp:250, money:150 } },
+  { id:'m_tool',     title:'Upgrade Time',   desc:'Buy or upgrade a tool.',    stat:'upgradesApplied', target:1,     reward:{ xp:100, money:60 } },
+  { id:'m_machine',  title:'Automation',     desc:'Build your first machine.', stat:'machinesBuilt',   target:1,     reward:{ xp:500, money:400 } },
+  { id:'m_lvl5',     title:'Rising',         desc:'Reach level 5.',            stat:'__level',         target:5,     reward:{ xp:0,   money:200 } },
+  { id:'m_lvl15',    title:'Experienced',    desc:'Reach level 15.',           stat:'__level',         target:15,    reward:{ xp:0,   money:1000 } }
 ];
-function misBadge(){let any=false;for(const m of MISSIONS){const st=S.missions[m.id]||{};
- if(!st.claimed&&m.g()>=m.t)any=true}$('mis-badge').classList.toggle('on',any)}
 
-/* ================= [TUTORIAL] ================= */
-const TUT=[
- 'مرحبًا بك في HAYSTACK 🌾 استخدم عصا التحكم اليسرى للمشي',
- 'اسحب بإصبعك على الجهة اليمنى للنظر بسلاسة 👀',
- 'اقترب من كومة القش القريبة منك',
- 'اضغط زر ⛏ الذهبي لإزالة القش',
- 'هناك إبرة مفقودة داخل هذا القش… واصل البحث حتى تجدها 🪡',
- 'رائع! الآن بِع القش في منصة البيع الخضراء 💰',
- 'أخيرًا: اشترِ أداتك الأولى من المتجر الأزرق 🛒',
-];
-let tutAcc=0;
-function tutUpdate(dt){if(!S||S.tut>=TUT.length){$('tut-bar').classList.add('hide');return}
- $('tut-bar').classList.remove('hide');$('tut-text').textContent=TUT[S.tut];
- const dots=$('tut-dots');if(dots.childElementCount!==TUT.length){dots.innerHTML='';TUT.forEach(()=>dots.appendChild(document.createElement('i')))}
- [...dots.children].forEach((d,i)=>d.classList.toggle('done',i<=S.tut));
- let done=false;
- switch(S.tut){
-  case 0:tutAcc+=Math.hypot(Input.joy.x,Input.joy.y)*dt;if(tutAcc>1.5)done=true;break;
-  case 1:if(Player.lookDist>120)done=true;break;
-  case 2:if(Hay.piles.some(p=>Math.hypot(Player.pos.x-p.def.x,Player.pos.z-p.def.z)<p.def.R+2.5))done=true;break;
-  case 3:if(S.stats.hayRemoved>=1)done=true;break;
-  case 4:if(S.stats.needles>=1)done=true;break;
-  case 5:if(S.stats.soldValue>0)done=true;break;
-  case 6:if(S.stats.toolsBought>=1)done=true;break}
- if(done){S.tut++;AudioSys.coin();UI.toast('✔ خطوة مكتملة','gold');
-  if(S.tut>=TUT.length){UI.toast('انتهى الدرس! المزرعة ملكك الآن 🎉','gold');$('tut-bar').classList.add('hide')}
-  scheduleSave()}}
-$('tut-skip').onclick=()=>{S.tut=TUT.length;$('tut-bar').classList.add('hide');scheduleSave()};
-
-/* ================= [UI] Modals ================= */
-const Modals={cur:null,
- open(id){this.cur=id;UI.modalOpen=true;$('modal-root').classList.add('on');this.render()},
- close(){this.cur=null;UI.modalOpen=false;$('modal-root').classList.remove('on');Input.actionHeld=false},
- render(){const b=$('sheet-body');b.innerHTML='';const T=$('sheet-title');
-  if(this.cur==='inv'){T.textContent='🎒 الحقيبة';b.appendChild(this.invView())}
-  else if(this.cur==='shop'){T.textContent='🛒 المتجر';b.appendChild(this.shopView())}
-  else if(this.cur==='sell'){T.textContent='💰 منصة البيع';b.appendChild(this.sellView())}
-  else if(this.cur==='mis'){T.textContent='📜 المهام';b.appendChild(this.misView())}
-  else if(this.cur==='set'){T.textContent='⚙️ الإعدادات';b.appendChild(this.setView())}
-  b.scrollTop=0},
- row(ic,name,desc,rarity,extra){const r=document.createElement('div');r.className='row';
-  const icc=document.createElement('div');icc.className='ic';icc.style.borderColor=RARITY[rarity].c;icc.style.background=RARITY[rarity].c+'22';icc.textContent=ic;
-  const info=document.createElement('div');info.className='info';
-  info.innerHTML=`<div class="nm">${name}</div><div class="ds">${desc}</div>`;if(extra)info.insertAdjacentHTML('beforeend',extra);
-  r.append(icc,info);return r},
- btn(txt,cls,fn){const b=document.createElement('button');b.className='btn '+cls;b.textContent=txt;b.onclick=fn;return b},
- invView(){const w=document.createElement('div');
-  const tabs=document.createElement('div');tabs.className='tabs';
-  const t1=this.btn('العناصر','alt',()=>show('items')),t2=this.btn('الأدوات','alt',()=>show('tools'));
-  tabs.append(t1,t2);w.appendChild(tabs);
-  const body=document.createElement('div');w.appendChild(body);
-  const wl=document.createElement('div');wl.className='wlabel';
-  const wb=document.createElement('div');wb.id='weight-bar';const wf=document.createElement('div');wf.id='weight-fill';
-  wb.appendChild(wf);w.append(wl,wb);
-  const updW=()=>{const wt=invWeight();wl.textContent=`الوزن: ${wt.toFixed(1)} / ${S.bagCap} كجم`;
-   wf.style.width=Math.min(100,wt/S.bagCap*100)+'%';wf.style.background=wt/S.bagCap>.9?'#ff5252':''};
-  const show=tab=>{t1.classList.toggle('on',tab==='items');t2.classList.toggle('on',tab==='tools');body.innerHTML='';
-   if(tab==='items'){const grid=document.createElement('div');grid.className='grid';
-    const entries=Object.entries(S.inv).filter(([k,v])=>v>0&&ITEMS[k]);
-    entries.sort((a,b)=>RARITY[ITEMS[b[0]].r].xp-RARITY[ITEMS[a[0]].r].xp);
-    for(const[id,q]of entries){const it=ITEMS[id];const s=document.createElement('div');s.className='slot';
-     s.style.borderColor=RARITY[it.r].c;s.innerHTML=`<span>${it.i}</span><span class="q">${q}</span>`;
-     s.onclick=()=>this.detail(id);grid.appendChild(s)}
-    for(let i=entries.length;i<20;i++){const s=document.createElement('div');s.className='slot empty';s.textContent='·';grid.appendChild(s)}
-    body.appendChild(grid);updW()}
-   else{for(const id in S.tools){const t=TOOLS[id],lvl=S.tools[id].lvl||0;
-     const r=this.row(id==='hands'?'✋':'🛠',t.n+(lvl?` +${lvl}`:''),t.d,'common',
-      `<div class="st">سعة ${Math.round(t.cap*(1+.3*lvl))} · سرعة ${(t.cd*Math.pow(.92,lvl)).toFixed(2)}ث · ندرة +${Math.round((t.rar+.15*lvl)*100)}%</div>`);
-     if(S.equipped===id){const b=this.btn('مُجهَّزة ✓','alt',null);b.disabled=true;r.appendChild(b)}
-     else r.appendChild(this.btn('تجهيز','',( )=>{S.equipped=id;Hands.setTool(id);UI.hud();AudioSys.buy();this.render();scheduleSave()}));
-     body.appendChild(r)}}};
-  show('items');return w},
- detail(id){const it=ITEMS[id],R=RARITY[it.r];
-  const p=document.createElement('div');p.className='detail-pop';
-  p.innerHTML=`<div style="font-size:52px;text-align:center;color:${R.c};filter:drop-shadow(0 0 12px ${R.c})">${it.i}</div>
-   <div style="text-align:center;font-weight:900;font-size:20px">${it.n}</div>
-   <div style="text-align:center;font-size:12px;color:${R.c};font-weight:900">${R.n} · $${it.v} · ${it.w} كجم</div>
-   <div style="text-align:center;font-size:13px;color:var(--dim)">${it.d}</div>
-   <div style="text-align:center;font-size:13px">تملك: <b>${S.inv[id]||0}</b></div>`;
-  p.appendChild(this.btn('إغلاق','alt',()=>p.remove()));$('sheet-body').appendChild(p)},
- shopView(){const w=document.createElement('div');
-  const head=document.createElement('div');head.style.cssText='font-size:12px;color:var(--dim);margin-bottom:10px';
-  head.textContent='كل أداة تُغيّر اللعب فعليًا: السعة = كمية القش لكل ضربة، الندرة = فرصة أكبر للعثور على الأشياء الثمينة.';
-  w.appendChild(head);
-  for(const id in TOOLS){const t=TOOLS[id];const owned=!!S.tools[id];const lvl=owned?(S.tools[id].lvl||0):0;
-   const r=this.row(id==='hands'?'✋':'🛠',t.n+(lvl?` +${lvl}`:''),t.d,'common',
-    `<div class="st">سعة ${Math.round(t.cap*(1+.3*lvl))} · سرعة ${(t.cd*Math.pow(.92,lvl)).toFixed(2)}ث · ندرة +${Math.round((t.rar+.15*lvl)*100)}% · طاقة ${t.stam}</div>`);
-   if(!owned){const b=this.btn('$'+t.price,'',()=>{if(S.money<t.price){UI.toast('لا تملك ما يكفي من المال','bad');AudioSys.deny();return}
-     S.money-=t.price;S.tools[id]={lvl:0};S.stats.toolsBought++;AudioSys.buy();
-     UI.toast('اشتريت '+t.n+'! جهّزها من الحقيبة 🎒','gold');Bus.emit('money');Bus.emit('stat');this.render();scheduleSave()});
-    if(S.money<t.price)b.style.opacity=.55;r.appendChild(b)}
-   else{if(lvl<3){const c=upCost(id);const b=this.btn('ترقية $'+c,'grn',()=>{if(S.money<c){UI.toast('لا تملك ما يكفي للترقية','bad');AudioSys.deny();return}
-     S.money-=c;S.tools[id].lvl=lvl+1;S.stats.upgrades++;AudioSys.buy();UI.toast('تمت ترقية '+t.n+' إلى +'+(lvl+1)+' ⬆','gold');
-     Bus.emit('money');Bus.emit('stat');this.render();scheduleSave()});
-    if(S.money<c)b.style.opacity=.55;r.appendChild(b)}
-    else{const b=this.btn('أقصى مستوى','alt',null);b.disabled=true;r.appendChild(b)}}
-   w.appendChild(r)}
-  const c=bagCost();const r=this.row('🎒','حقيبة أكبر',`زيادة سعة الحقيبة +25 كجم (الحالية ${S.bagCap} كجم)`,'uncommon');
-  const b=this.btn('$'+c,'',()=>{if(S.money<c){UI.toast('لا تملك ما يكفي','bad');AudioSys.deny();return}
-   S.money-=c;S.bagLvl++;S.bagCap+=25;AudioSys.buy();UI.toast('أصبحت حقيبتك تتسع '+S.bagCap+' كجم!','gold');
-   Bus.emit('money');this.render();scheduleSave()});
-  if(S.money<c)b.style.opacity=.55;r.appendChild(b);w.appendChild(r);return w},
- sellView(){const w=document.createElement('div');
-  const entries=Object.entries(S.inv).filter(([k,v])=>v>0&&ITEMS[k]&&ITEMS[k].v>0&&ITEMS[k].c!=='tool');
-  if(!entries.length){w.innerHTML='<div style="text-align:center;color:var(--dim);padding:30px">لا شيء للبيع.<br>اجمع القش وابحث في الأكوام! 🌾</div>';return w}
-  const sum=document.createElement('div');sum.style.cssText='font-size:12px;color:var(--dim);margin-bottom:10px';
-  const total=entries.reduce((a,[k,v])=>a+ITEMS[k].v*v,0);sum.textContent=`قيمة كل ما تملكه: $${fmt(total)}`;w.appendChild(sum);
-  const sellAll=this.btn('💰 بيع الكل ($'+fmt(total)+')','grn',()=>{let gain=0;
-   for(const[k,v]of Object.entries(S.inv)){if(v>0&&ITEMS[k]&&ITEMS[k].c!=='tool'){gain+=ITEMS[k].v*v;delete S.inv[k]}}
-   if(gain>0){addMoney(gain,true);S.stats.soldValue+=gain;gainXP(Math.floor(gain/8));AudioSys.sell();
-    UI.toast('بعت كل شيء مقابل $'+fmt(gain)+' 💰','gold');Bus.emit('stat');Bus.emit('inv');this.render();scheduleSave()}});
-  w.appendChild(sellAll);
-  for(const[id,q]of entries){const it=ITEMS[id];
-   const r=this.row(it.i,`${it.n} ×${q}`,`سعر الوحدة $${it.v}`,it.r);
-   r.appendChild(this.btn('بيع 1','',()=>{S.inv[id]--;if(S.inv[id]<=0)delete S.inv[id];
-    addMoney(it.v,true);S.stats.soldValue+=it.v;gainXP(Math.max(1,Math.floor(it.v/8)));AudioSys.sell();
-    Bus.emit('stat');Bus.emit('inv');this.render();scheduleSave()}));
-   r.appendChild(this.btn('بيع الكل','',( )=>{const gain=it.v*q;delete S.inv[id];
-    addMoney(gain,true);S.stats.soldValue+=gain;gainXP(Math.max(1,Math.floor(gain/8)));AudioSys.sell();
-    UI.toast('+$'+fmt(gain),'gold');Bus.emit('stat');Bus.emit('inv');this.render();scheduleSave()}));
-   w.appendChild(r)}
-  return w},
- misView(){const w=document.createElement('div');
-  for(const m of MISSIONS){const st=S.missions[m.id]||{};const prog=Math.min(m.t,m.g());const done=prog>=m.t;
-   const r=this.row(done?'✅':'📌',m.n,m.d,'common',
-    `<div class="pbar"><i style="width:${prog/m.t*100}%"></i></div><div class="st">${fmt(prog)} / ${fmt(m.t)} — مكافأة $${m.rw.money}</div>`);
-   if(st.claimed){const b=this.btn('مكتملة ✓','alt',null);b.disabled=true;r.appendChild(b)}
-   else if(done){r.appendChild(this.btn('مطالبة 🎁','grn',()=>{S.missions[m.id]={claimed:true};
-    addMoney(m.rw.money,false);gainXP(30);AudioSys.fanfare();UI.toast('مكافأة المهمة: $'+m.rw.money,'gold');
-    Bus.emit('stat');this.render();misBadge();scheduleSave()}))}
-   else{const b=this.btn('…','alt',null);b.disabled=true;r.appendChild(b)}
-   w.appendChild(r)}
-  return w},
- setView(){const w=document.createElement('div');
-  const mk=(label,ctrl)=>{const r=document.createElement('div');r.className='set-row';
-   const l=document.createElement('div');l.textContent=label;r.append(l,ctrl);return r};
-  const sens=document.createElement('input');sens.type='range';sens.min=.4;sens.max=3;sens.step=.1;sens.value=S.settings.sens;
-  sens.oninput=()=>S.settings.sens=+sens.value;sens.onchange=scheduleSave;
-  w.appendChild(mk('حساسية النظر',sens));
-  const fov=document.createElement('input');fov.type='range';fov.min=60;fov.max=100;fov.step=1;fov.value=S.settings.fov;
-  fov.oninput=()=>{S.settings.fov=+fov.value;Player.fov=S.settings.fov};fov.onchange=scheduleSave;
-  w.appendChild(mk('مجال الرؤية (FOV)',fov));
-  const q=document.createElement('select');['low','med','high'].forEach(v=>{const o=document.createElement('option');
-   o.value=v;o.textContent={low:'منخفض (أداء أعلى)',med:'متوسط',high:'عالي'}[v];if(S.settings.quality===v)o.selected=true;q.appendChild(o)});
-  q.onchange=()=>{applyQuality(q.value);UI.toast('تم تطبيق جودة الرسوميات')};
-  w.appendChild(mk('جودة الرسوميات',q));
-  const aud=document.createElement('button');aud.className='toggle'+(S.settings.audio?' on':'');aud.textContent=S.settings.audio?'🔊 الصوت: يعمل':'🔇 الصوت: متوقف';
-  aud.onclick=()=>{S.settings.audio=!S.settings.audio;AudioSys.on=S.settings.audio;
-   if(AudioSys.master)AudioSys.master.gain.value=S.settings.audio?.5:0;
-   aud.className='toggle'+(S.settings.audio?' on':'');aud.textContent=S.settings.audio?'🔊 الصوت: يعمل':'🔇 الصوت: متوقف';scheduleSave()};
-  w.appendChild(mk('الصوت',aud));
-  const inv=document.createElement('button');inv.className='toggle'+(S.settings.invert?' on':'');inv.textContent=S.settings.invert?'معكوس ↕':'عادي ↕';
-  inv.onclick=()=>{S.settings.invert=!S.settings.invert;inv.className='toggle'+(S.settings.invert?' on':'');inv.textContent=S.settings.invert?'معكوس ↕':'عادي ↕';scheduleSave()};
-  w.appendChild(mk('عكس محور النظر',inv));
-  const saveB=this.btn('💾 حفظ الآن','',( )=>{saveNow();UI.toast('تم الحفظ ✓','gold')});
-  const tutB=this.btn('🔁 إعادة الدرس التعليمي','alt',()=>{S.tut=0;tutAcc=0;Player.lookDist=0;this.close();scheduleSave()});
-  const resetB=this.btn('🗑 مسح الحفظ والبدء من جديد','alt',()=>{if(confirm('سيتم مسح كل تقدمك نهائيًا. هل أنت متأكد؟')){SaveSys.del('save');location.reload()}});
-  const about=document.createElement('div');about.style.cssText='font-size:11px;color:var(--dim);text-align:center;margin-top:14px';
-  about.innerHTML='HAYSTACK v0.2.0 — نظام تحكم سلس ومحسّن ⛏';
-  const col=document.createElement('div');col.style.cssText='display:flex;flex-direction:column;gap:8px;margin-top:10px';
-  col.append(saveB,tutB,resetB);w.append(col,about);return w}};
-$('sheet-close').onclick=()=>Modals.close();$('backdrop').onclick=()=>Modals.close();
-
-/* ================= game loop ================= */
-let last=performance.now(),fpsAcc=0,fpsN=0,fpsT=0;
-const FWD=new THREE.Vector3(),RIGHT=new THREE.Vector3(),MOVE=new THREE.Vector3();
-function update(dt){
- // 1. تنعيم حركة الكاميرا (Smooth Damping)
- Player.yaw = lerp(Player.yaw, Player.targetYaw, Math.min(1, dt * 18));
- Player.pitch = lerp(Player.pitch, Player.targetPitch, Math.min(1, dt * 18));
-
- // 2. حركة اللاعب
- let mx = Input.joy.x, my = Input.joy.y;
- if(Input.keys.KeyW)my+=1;if(Input.keys.KeyS)my-=1;if(Input.keys.KeyA)mx-=1;if(Input.keys.KeyD)mx+=1;
- const k=Math.hypot(mx,my);if(k>1){mx/=k;my/=k}
- const moving=k>.05;
- const sprint=(Input.sprint||Input.keys.ShiftLeft)&&moving&&Player.stamina>1;
- let spd=sprint?6.4:3.5;
-
- FWD.set(-Math.sin(Player.yaw),0,-Math.cos(Player.yaw));
- RIGHT.set(Math.cos(Player.yaw),0,-Math.sin(Player.yaw));
- MOVE.set(0,0,0).addScaledVector(FWD,my).addScaledVector(RIGHT,mx);
- if(MOVE.lengthSq()>0)MOVE.normalize();
- Player.pos.addScaledVector(MOVE,spd*dt);
-
- if(sprint)Player.stamina=Math.max(0,Player.stamina-16*dt);
- else Player.stamina=Math.min(100,Player.stamina+(moving?9:16)*dt);
- UI.stamina();
-
- Player.vy-=22*dt;let ny=Player.pos.y+Player.vy*dt;
- if(ny<=0){if(!Player.grounded&&Player.vy<-5){Particles.burst(new THREE.Vector3(Player.pos.x,0,Player.pos.z),6,0x9b8a6a,1.4,1)}
-  Player.pos.y=0;Player.vy=0;Player.grounded=true}else{Player.pos.y=ny;Player.grounded=false}
-
- for(const c of Colliders){const dx=Player.pos.x-c.x,dz=Player.pos.z-c.z;const d=Math.hypot(dx,dz),min=c.r+.42;
-  if(d<min&&d>.0001){const push=(min-d)/d;Player.pos.x+=dx*push;Player.pos.z+=dz*push}}
- Player.pos.x=clamp(Player.pos.x,-33,33);Player.pos.z=clamp(Player.pos.z,-28,28);
- Player.moveDist+=spd*dt*(moving?1:0);
-
- const spdNow=moving?spd:0;
- if(Player.grounded&&moving){Player.bobT+=dt*spdNow*1.7;Player.stepT-=dt*spdNow;
-  if(Player.stepT<=0){Player.stepT=2.1;AudioSys.step(sprint)}}
-
- Player.pitchKick=lerp(Player.pitchKick,0,Math.min(1,dt*8));
- Player.shakeAmp=Math.max(0,Player.shakeAmp-dt*.5);
- const shx=(Math.random()-.5)*Player.shakeAmp,shy=(Math.random()-.5)*Player.shakeAmp;
- const bobY=Player.grounded&&moving?Math.abs(Math.sin(Player.bobT))*.05:0;
- camera.position.set(Player.pos.x+shx,Player.eye()+Player.pos.y+bobY+shy,Player.pos.z);
- camera.rotation.set(Player.pitch+Player.pitchKick,Player.yaw,0);
-
- const tfov=sprint?S.settings.fov+8:S.settings.fov;
- camera.fov=lerp(camera.fov,tfov,Math.min(1,dt*5));camera.updateProjectionMatrix();
-
- actionCd=Math.max(0,actionCd-dt);
- if(Input.actionHeld&&actionCd<=0&&!UI.modalOpen)doInteract();
-
- updateHover(dt);
- Hands.update(dt,moving?spd/3.4:0);
- Pickups.update(dt,new THREE.Vector3(Player.pos.x,Player.pos.y+.8,Player.pos.z));
- Particles.update(dt);Floaters.update(dt);
- for(const z of ZONES)if(z.beam)z.beam.rotation.y+=dt*.5;
- for(const c of Clouds)c.position.x+=dt*.6;
- tutUpdate(dt);misBadge();
-
- fpsN++;fpsT+=dt;if(fpsT>=1){$('fps-tag').textContent=Math.round(fpsN/fpsT)+' FPS';fpsN=0;fpsT=0}}
-
-function loop(now){requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/1000);last=now;
- update(dt);renderer.render(scene,camera)}
-
-/* ================= boot ================= */
-async function boot(){
- drawLogo();
- await SaveSys.init();$('load-fill').style.width='25%';
- const raw=await SaveSys.get('save');
- S=Object.assign(freshState(),raw||{});
- S.settings=Object.assign(freshState().settings,raw?.settings||{});
- S.stats=Object.assign(freshState().stats,raw?.stats||{});
- if(raw){S.inv=Object.assign({},raw.inv||{});S.tools=Object.assign({hands:{lvl:0}},raw.tools||{});
-  S.missions=raw.missions||{};S.piles=raw.piles||{};if(!TOOLS[S.equipped])S.equipped='hands'}
- AudioSys.on=S.settings.audio;
- $('load-fill').style.width='40%';
- makeTextures();initThree();scene.add(camera);
- const q=QUALITY[S.settings.quality];renderer.setPixelRatio(Math.min(devicePixelRatio,q.dpr));
- buildWorld();
- for(const c of[...Colliders])c.hayCol=false;
- Hay.build(q.pieces);
- for(const p of Hay.piles){const cc={x:p.def.x,z:p.def.z,r:p.def.R*.55,hayCol:true};
-  if(!Colliders.some(c=>c.hayCol&&c.x===cc.x&&c.z===cc.z))Colliders.push(cc)}
- Particles.init();Floaters.init();initReticle();Hands.build();
- initInput();UI.hud();UI.stamina();
- Player.fov=S.settings.fov;camera.fov=S.settings.fov;
- $('load-fill').style.width='80%';
- setInterval(()=>saveNow(),20000);
- setInterval(misBadge,1500);
- if(raw&&Date.now()-S.ts<1000*60*60*24*30)UI.toast('تم تحميل حفظك بنجاح ✓','gold');
- $('load-fill').style.width='100%';
- setTimeout(()=>{$('loading').style.transition='opacity .4s';$('loading').style.opacity=0;
-  setTimeout(()=>$('loading').remove(),420)},300);
- requestAnimationFrame(loop);
+class MissionSystem {
+  constructor(game) { this.game = game; this.claimed = {}; this.busy = {}; }
+  getProgress(m) {
+    const stats = this.game.statistics;
+    return m.stat === '__level' ? this.game.state.level : stats.get(m.stat);
+  }
+  canClaim(m) { return !this.claimed[m.id] && this.getProgress(m) >= m.target; }
+  claim(id) {
+    const m = MISSIONS.find(x => x.id === id);
+    if (!m || !this.canClaim(m)) return false;
+    this.claimed[id] = true;
+    const r = m.reward || {};
+    const parts = [];
+    if (r.xp)    { this.game.addXP(r.xp); parts.push(`+${r.xp} XP`); }
+    if (r.money) { this.game.state.money += r.money; parts.push(`+$${r.money}`); }
+    this.game.statistics.inc('missionsCompleted', 1);
+    this.game.ui.notify(`✅ ${m.title} — ${parts.join('  ')}`, 'rare');
+    this.game.audio.play('mission');
+    this.game.ui.refresh();
+    return true;
+  }
+  check() {
+    for (const m of MISSIONS) {
+      if (this.claimed[m.id] || this.busy[m.id]) continue;
+      if (this.getProgress(m) >= m.target) {
+        this.busy[m.id] = true;
+        this.game.ui.notify(`📋 Mission ready: ${m.title}`, 'rare');
+        this.game.audio.play('notify');
+      }
+    }
+  }
+  serialize() { return { claimed: {...this.claimed}, busy: {...this.busy} }; }
+  deserialize(d) { if (!d) return; this.claimed = d.claimed || {}; this.busy = d.busy || {}; }
 }
-boot().catch(e=>{console.error(e);$('load-tip').textContent='خطأ في التحميل: '+e.message;$('load-tip').style.color='#ff6b6b'});
-</script>
-</body>
-</html>
+
+/* ==================== AREAS ==================== */
+const AREAS = [
+  { id:'field',     name:'Basic Hay Field',   desc:'Easy search.',       reqLevel:1,  reqMoney:0,      difficulty:'Easy',    piles:4, hayPerPile:1300, itemMult:1.0, rareMult:1.0, pos:{ x:0, z:0 } },
+  { id:'barn',      name:'Old Barn',          desc:'Denser hay.',        reqLevel:5,  reqMoney:500,    difficulty:'Medium',  piles:5, hayPerPile:1800, itemMult:1.2, rareMult:1.4, pos:{ x:0, z:-60 } },
+  { id:'storage',   name:'Large Hay Storage', desc:'Rich objects.',      reqLevel:12, reqMoney:5000,   difficulty:'Hard',    piles:6, hayPerPile:2400, itemMult:1.5, rareMult:2.0, pos:{ x:0, z:-120 } },
+  { id:'abandoned', name:'Abandoned Farm',    desc:'Ancient debris.',    reqLevel:20, reqMoney:25000,  difficulty:'Hard',    piles:6, hayPerPile:3000, itemMult:1.8, rareMult:2.8, pos:{ x:0, z:-180 } },
+  { id:'industrial',name:'Industrial Storage',desc:'Industrial yield.',  reqLevel:30, reqMoney:100000, difficulty:'Extreme', piles:8, hayPerPile:3600, itemMult:2.2, rareMult:3.5, pos:{ x:0, z:-240 } },
+  { id:'ancient',   name:'Ancient Hay Field', desc:'Legendary loot.',    reqLevel:45, reqMoney:500000, difficulty:'Extreme', piles:8, hayPerPile:4200, itemMult:3.0, rareMult:5.0, pos:{ x:0, z:-300 } }
+];
+
+class AreaSystem {
+  constructor(game) { this.game = game; this.unlocked = { field: true }; this.current = 'field'; }
+  get(id) { return AREAS.find(a => a.id === id); }
+  canUnlock(id) {
+    const a = this.get(id); if (!a) return { ok:false, reason:'Unknown.' };
+    if (this.unlocked[id]) return { ok:false, reason:'Already unlocked.' };
+    if (this.game.state.level < a.reqLevel) return { ok:false, reason:`Requires level ${a.reqLevel}.` };
+    if (this.game.state.money < a.reqMoney) return { ok:false, reason:`Requires $${a.reqMoney}.` };
+    return { ok:true };
+  }
+  unlock(id) {
+    const c = this.canUnlock(id); if (!c.ok) return c;
+    const a = this.get(id);
+    this.game.state.money -= a.reqMoney;
+    this.unlocked[id] = true;
+    this.game.statistics.data.areasUnlocked = Object.keys(this.unlocked).length;
+    this.game.ui.notify(`🌍 Area unlocked: ${a.name}`, 'legendary');
+    this.game.audio.play('unlock');
+    return { ok:true };
+  }
+  serialize() { return { unlocked: {...this.unlocked}, current: this.current }; }
+  deserialize(d) { if (!d) return; this.unlocked = d.unlocked || { field:true }; this.current = d.current || 'field'; }
+}
+
+/* ==================== AUDIO ==================== */
+class AudioSystem {
+  constructor() { this.ctx = null; this.master = null; this.enabled = true; this.lastPlay = {}; }
+  init() {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = 0.22;
+      this.master.connect(this.ctx.destination);
+    } catch (e) { this.enabled = false; }
+  }
+  resume() { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); }
+  _throttle(name, ms = 40) {
+    const now = performance.now();
+    if (this.lastPlay[name] && now - this.lastPlay[name] < ms) return true;
+    this.lastPlay[name] = now; return false;
+  }
+  tone(freq, dur, type='sine', vol=0.2, slideTo=null) {
+    if (!this.enabled || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    if (slideTo) osc.frequency.exponentialRampToValueAtTime(Math.max(1, slideTo), t + dur);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(g).connect(this.master);
+    osc.start(t); osc.stop(t + dur + 0.02);
+  }
+  chord(freqs, dur = 0.3, vol = 0.15) { for (const f of freqs) this.tone(f, dur, 'triangle', vol); }
+  play(name) {
+    if (!this.enabled || !this.ctx) return;
+    switch (name) {
+      case 'removeHay': if (this._throttle('removeHay', 60)) return; this.tone(180 + Math.random()*60, 0.10, 'sawtooth', 0.10, 90); break;
+      case 'findItem': this.tone(660, 0.12, 'triangle', 0.18); this.tone(880, 0.20, 'triangle', 0.14); break;
+      case 'findRare': this.chord([660, 880, 1320], 0.35, 0.14); break;
+      case 'findLegendary': this.chord([523, 659, 784, 1046], 0.55, 0.16); break;
+      case 'levelUp': this.chord([523, 659, 784, 1046, 1318], 0.6, 0.18); break;
+      case 'buy': this.tone(600, 0.08, 'square', 0.14); this.tone(900, 0.12, 'square', 0.12); break;
+      case 'sell': this.tone(800, 0.06, 'square', 0.12); this.tone(1200, 0.10, 'square', 0.10); break;
+      case 'notify': this.tone(880, 0.10, 'sine', 0.12); break;
+      case 'mission': this.chord([659, 880], 0.35, 0.16); break;
+      case 'achievement': this.chord([784, 988, 1175, 1568], 0.7, 0.18); break;
+      case 'unlock': this.chord([440, 587, 740], 0.5, 0.16); break;
+      case 'skillBuy': this.tone(523, 0.08, 'triangle', 0.16); this.tone(784, 0.14, 'triangle', 0.14); break;
+      case 'broken': this.tone(150, 0.30, 'sawtooth', 0.20, 60); break;
+      case 'click': this.tone(440, 0.04, 'sine', 0.10); break;
+      case 'error': this.tone(220, 0.15, 'sawtooth', 0.15, 160); break;
+    }
+  }
+}
+
+/* ==================== SAVE SYSTEM ==================== */
+class SaveSystem {
+  constructor() { this.db = null; this.store = 'save'; }
+  init() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('haystack', 1);
+      req.onupgradeneeded = e => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(this.store)) db.createObjectStore(this.store);
+      };
+      req.onsuccess = e => { this.db = e.target.result; resolve(); };
+      req.onerror = e => reject(e);
+    });
+  }
+  save(key, value) {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(this.store, 'readwrite');
+      const req = tx.objectStore(this.store).put(value, key);
+      req.onsuccess = () => resolve();
+      req.onerror = e => reject(e);
+    });
+  }
+  load(key) {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(this.store, 'readonly');
+      const req = tx.objectStore(this.store).get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = e => reject(e);
+    });
+  }
+  clear() {
+    return new Promise(resolve => {
+      const tx = this.db.transaction(this.store, 'readwrite');
+      tx.objectStore(this.store).clear();
+      tx.oncomplete = () => resolve();
+    });
+  }
+}
+
+/* ==================== INVENTORY ==================== */
+class Inventory {
+  constructor(maxSlots = 24) { this.slots = []; this.maxSlots = maxSlots; }
+  add(id, qty = 1) {
+    const item = ITEMS[id];
+    if (!item) return false;
+    let slot = this.slots.find(s => s.id === id && s.qty < item.stack);
+    if (slot) slot.qty += qty;
+    else {
+      if (this.slots.length >= this.maxSlots) return false;
+      this.slots.push({ id, qty });
+    }
+    return true;
+  }
+  remove(id, qty = 1) {
+    const slot = this.slots.find(s => s.id === id);
+    if (!slot) return false;
+    slot.qty -= qty;
+    if (slot.qty <= 0) this.slots = this.slots.filter(s => s !== slot);
+    return true;
+  }
+  count(id) { const s = this.slots.find(s => s.id === id); return s ? s.qty : 0; }
+  serialize() { return this.slots.map(s => ({ ...s })); }
+  deserialize(d) { this.slots = Array.isArray(d) ? d : []; }
+}
+
+/* ==================== STORAGE ==================== */
+class Storage {
+  constructor(capacity = 500) { this.capacity = capacity; this.items = {}; this.level = 1; }
+  get total() { return Object.values(this.items).reduce((a, n) => a + n, 0); }
+  get full() { return this.total >= this.capacity; }
+  add(id, qty) {
+    const room = this.capacity - this.total;
+    const actual = Math.min(qty, room);
+    if (actual > 0) this.items[id] = (this.items[id] || 0) + actual;
+    return actual;
+  }
+  take(id, qty) {
+    const have = this.items[id] || 0;
+    const actual = Math.min(qty, have);
+    if (actual > 0) { this.items[id] -= actual; if (this.items[id] <= 0) delete this.items[id]; }
+    return actual;
+  }
+  serialize() { return { capacity: this.capacity, items: {...this.items}, level: this.level }; }
+  deserialize(d) { if (!d) return; this.capacity = d.capacity || 500; this.items = d.items || {}; this.level = d.level || 1; }
+}
+
+/* ==================== MACHINES ==================== */
+const MACHINE_TYPES = {
+  mechRake: { id:'mechRake', name:'Mechanical Rake', icon:'🚜', price:8000, reqLevel:8, baseRate:12, baseCapacity:300, desc:'Automatically removes hay from one pile.' },
+  conveyor: { id:'conveyor', name:'Hay Conveyor', icon:'🔗', price:25000, reqLevel:15, baseRate:40, baseCapacity:800, desc:'Processes hay faster. Feeds storage.' },
+  separator:{ id:'separator',name:'Hay Separator', icon:'🧲', price:80000, reqLevel:22, baseRate:100, baseCapacity:2000, desc:'High-speed extraction with item sorting.' }
+};
+
+class Machine {
+  constructor(type, targetPile) {
+    this.type = type; this.targetPile = targetPile;
+    this.level = 1; this.running = true;
+    this.storage = { hay: 0 }; this.itemsFound = {};
+    this._accum = 0; this.energy = 100;
+  }
+  get rate()    { return this.type.baseRate * (1 + (this.level - 1) * 0.35); }
+  get capacity(){ return Math.floor(this.type.baseCapacity * (1 + (this.level - 1) * 0.5)); }
+  get hayStored(){ return this.storage.hay; }
+  get isFull()  { return this.hayStored >= this.capacity; }
+  update(dt, skills, events) {
+    if (!this.running || this.isFull) return;
+    const speedMult = skills.machineSpeedMult();
+    const amount = this.rate * speedMult * dt;
+    this._accum += amount;
+    const whole = Math.floor(this._accum);
+    if (whole < 1) return;
+    this._accum -= whole;
+    if (!this.targetPile || this.targetPile.remaining <= 0) { this.running = false; return; }
+    const center = this.targetPile.position.clone();
+    center.y += this.targetPile.size.y * 0.4;
+    const r = this.targetPile.removeAt(center, whole);
+    if (r.removed > 0) {
+      const cap = this.capacity;
+      const addHay = Math.min(r.removed, cap - this.storage.hay);
+      this.storage.hay += addHay;
+      events.emit('hayRemoved', { amount: r.removed, machine: this });
+      const found = this.targetPile.rollItems(r.removed);
+      for (const f of found) {
+        this.itemsFound[f.id] = (this.itemsFound[f.id] || 0) + f.qty;
+        events.emit('itemFound', { id: f.id, qty: f.qty, machine: this });
+      }
+    }
+  }
+  upgrade() { this.level++; }
+  upgradeCost() { return Math.floor(this.type.price * 0.6 * Math.pow(1.7, this.level)); }
+  serialize() {
+    return { typeId: this.type.id, level: this.level, running: this.running,
+      storage: {...this.storage}, itemsFound: {...this.itemsFound}, energy: this.energy };
+  }
+}
+
+class MachineManager {
+  constructor(game) { this.game = game; this.machines = []; }
+  canInstall(pile, typeId) {
+    const t = MACHINE_TYPES[typeId]; if (!t) return { ok:false, reason:'Unknown.' };
+    if (this.game.state.level < t.reqLevel) return { ok:false, reason:`Requires level ${t.reqLevel}.` };
+    if (this.game.state.money < t.price) return { ok:false, reason:'Not enough money.' };
+    return { ok:true };
+  }
+  install(typeId, pile) {
+    const c = this.canInstall(pile, typeId); if (!c.ok) return c;
+    const t = MACHINE_TYPES[typeId];
+    this.game.state.money -= t.price;
+    this.machines.push(new Machine(t, pile));
+    this.game.statistics.inc('machinesBuilt', 1);
+    this.game.ui.notify(`⚙ ${t.name} installed.`, 'rare');
+    this.game.audio.play('unlock');
+    this.game.ui.refresh();
+    return { ok:true };
+  }
+  collect(machine) {
+    const stored = machine.storage.hay;
+    if (stored > 0) { this.game.inventory.add('hay', stored); machine.storage.hay = 0; }
+    let count = 0;
+    for (const [id, qty] of Object.entries(machine.itemsFound)) {
+      this.game.inventory.add(id, qty); count += qty;
+    }
+    machine.itemsFound = {};
+    if (stored > 0 || count > 0) {
+      this.game.ui.notify(`📦 Collected ${stored} hay${count ? ` + ${count} items` : ''}.`, 'uncommon');
+      this.game.audio.play('sell');
+    }
+  }
+  update(dt) { for (const m of this.machines) m.update(dt, this.game.skills, this.game.events); }
+  serialize() {
+    const pileIdx = p => this.game.hayPiles.indexOf(p);
+    return this.machines.map(m => ({ ...m.serialize(), pileIdx: pileIdx(m.targetPile) }));
+  }
+  deserialize(d) {
+    if (!Array.isArray(d)) return;
+    this.machines = [];
+    for (const m of d) {
+      const pile = this.game.hayPiles[m.pileIdx]; if (!pile) continue;
+      const type = Object.values(MACHINE_TYPES).find(t => t.id === m.typeId); if (!type) continue;
+      const machine = new Machine(type, pile);
+      machine.level = m.level || 1;
+      machine.running = !!m.running;
+      machine.storage = m.storage || { hay:0 };
+      machine.itemsFound = m.itemsFound || {};
+      machine.energy = m.energy ?? 100;
+      this.machines.push(machine);
+    }
+  }
+}
+
+/* ==================== HAY PILE ==================== */
+const HAY_GEO = new THREE.BoxGeometry(0.35, 0.06, 0.09);
+const HAY_MAT = new THREE.MeshStandardMaterial({ roughness: 0.95, metalness: 0.02 });
+
+function mulberry32(a) {
+  return function () {
+    let t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+class HayPile {
+  constructor(scene, position, count = 1200, size = { x:3, y:2.2, z:3 }, seed = 1) {
+    this.scene = scene;
+    this.position = position.clone();
+    this.count = count; this.size = size; this.seed = seed;
+    this.remaining = count;
+    this.alive = new Uint8Array(count).fill(1);
+    this.positions = new Float32Array(count * 3);
+    this.ctx = { tier:0, itemMult:1, rareMult:1, precisionBonus:0, rareBonus:0, treasureBonus:0 };
+
+    const rand = mulberry32(seed);
+    const dummy = new THREE.Object3D();
+    const mesh = new THREE.InstancedMesh(HAY_GEO, HAY_MAT.clone(), count);
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+
+    const colorArr = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      const t = Math.pow(rand(), 0.65);
+      const py = t * size.y;
+      const taper = 1 - t * 0.7;
+      const angle = rand() * Math.PI * 2;
+      const rad = Math.sqrt(rand()) * (size.x / 2) * taper;
+      const px = Math.cos(angle) * rad;
+      const pz = Math.sin(angle) * rad;
+      this.positions[i * 3] = px;
+      this.positions[i * 3 + 1] = py + 0.05;
+      this.positions[i * 3 + 2] = pz;
+      dummy.position.set(px, py + 0.05, pz);
+      dummy.rotation.set(rand() * Math.PI, rand() * Math.PI, rand() * Math.PI);
+      dummy.scale.setScalar(0.85 + rand() * 0.4);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+      const c = new THREE.Color().setHSL(0.125 + rand() * 0.02, 0.55, 0.5 + rand() * 0.15);
+      colorArr[i*3] = c.r; colorArr[i*3+1] = c.g; colorArr[i*3+2] = c.b;
+    }
+    mesh.instanceColor = new THREE.InstancedBufferAttribute(colorArr, 3);
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.position.copy(position);
+    scene.add(mesh);
+    this.mesh = mesh;
+
+    this.proxy = new THREE.Mesh(
+      new THREE.BoxGeometry(size.x * 1.05, size.y, size.z * 1.05),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    this.proxy.position.copy(position);
+    this.proxy.position.y += size.y / 2;
+    scene.add(this.proxy);
+  }
+  setSearchContext(c) { this.ctx = c; }
+  removeAt(worldPoint, amount) {
+    if (this.remaining <= 0) return { removed: 0 };
+    const lx = worldPoint.x - this.position.x;
+    const ly = worldPoint.y - this.position.y;
+    const lz = worldPoint.z - this.position.z;
+    const scored = [];
+    for (let i = 0; i < this.count; i++) {
+      if (!this.alive[i]) continue;
+      const dx = this.positions[i*3] - lx;
+      const dy = this.positions[i*3+1] - ly;
+      const dz = this.positions[i*3+2] - lz;
+      scored.push({ i, d: dx*dx + dy*dy + dz*dz });
+    }
+    scored.sort((a, b) => a.d - b.d);
+    const remove = Math.min(amount, scored.length);
+    if (remove === 0) return { removed: 0 };
+    const dummy = new THREE.Object3D();
+    dummy.position.set(0, -9999, 0); dummy.scale.setScalar(0); dummy.updateMatrix();
+    for (let k = 0; k < remove; k++) {
+      const idx = scored[k].i;
+      this.alive[idx] = 0;
+      this.mesh.setMatrixAt(idx, dummy.matrix);
+    }
+    this.mesh.instanceMatrix.needsUpdate = true;
+    this.remaining -= remove;
+    return { removed: remove };
+  }
+  rollItems(amount) {
+    const ctx = this.ctx;
+    const rolls = Math.max(1, Math.floor(amount / 4));
+    const found = [];
+    for (let r = 0; r < rolls; r++) {
+      let roll = Math.random();
+      roll -= ctx.precisionBonus * 0.03;
+      if (roll < 0) roll = 0;
+      const areaBoost = ctx.itemMult - 1;
+      const rareBoost = ctx.rareBonus + ctx.treasureBonus;
+      const t = ctx.tier;
+      const th = {
+        mythic:    Math.max(0.0001, 0.0004 + t * 0.0002 - rareBoost * 0.0001),
+        legendary: Math.max(0.0008, 0.0030 + t * 0.0010 - rareBoost * 0.0005),
+        epic:      Math.max(0.002,  0.0100 + t * 0.0030 - rareBoost * 0.0010),
+        rare:      Math.max(0.008,  0.0350 + t * 0.0080 - rareBoost * 0.0020),
+        uncommon:  0.1300 + t * 0.0150
+      };
+      let id = null;
+      if (roll < th.mythic) id = 'mysteryNeedle';
+      else if (roll < th.legendary) id = Math.random() < 0.4 ? 'ancientNeedle' : (Math.random() < 0.5 ? 'ancientObj' : 'treasurePiece');
+      else if (roll < th.epic) id = Math.random() < 0.35 ? 'goldenNeedle' : (Math.random() < 0.5 ? 'goldObj' : 'silverObj');
+      else if (roll < th.rare) id = Math.random() < 0.3 ? 'silverNeedle' : (Math.random() < 0.5 ? 'watch' : (Math.random() < 0.5 ? 'ring' : 'toolPart'));
+      else if (roll < th.uncommon) id = ['coin','rope','scrap','metal','key','toy','needle'][Math.floor(Math.random()*7)];
+      else if (roll < th.uncommon + 0.10 * areaBoost + 0.20) id = ['wood','cloth','bottle','button'][Math.floor(Math.random()*4)];
+      else if (roll < th.uncommon + 0.45 * areaBoost + 0.55) id = 'straw';
+      if (id) found.push(id);
+    }
+    const map = {};
+    for (const id of found) map[id] = (map[id] || 0) + 1;
+    return Object.entries(map).map(([id, qty]) => ({ id, qty }));
+  }
+  serialize() {
+    return { seed:this.seed, count:this.count, size:this.size,
+      position: this.position.toArray(), alive: Array.from(this.alive) };
+  }
+  deserialize(d) {
+    if (!d || !d.alive) return;
+    const dummy = new THREE.Object3D();
+    dummy.position.set(0, -9999, 0); dummy.scale.setScalar(0); dummy.updateMatrix();
+    let alive = 0;
+    for (let i = 0; i < Math.min(this.count, d.alive.length); i++) {
+      if (d.alive[i]) alive++;
+      else { this.alive[i] = 0; this.mesh.setMatrixAt(i, dummy.matrix); }
+    }
+    this.mesh.instanceMatrix.needsUpdate = true;
+    this.remaining = alive;
+  }
+  dispose() {
+    this.scene.remove(this.mesh);
+    this.scene.remove(this.proxy);
+    this.mesh.geometry.dispose();
+    this.mesh.material.dispose();
+  }
+}
+
+/* ==================== WORLD ==================== */
+class World {
+  constructor(scene) { this.scene = scene; }
+  build() {
+    this.scene.add(new THREE.HemisphereLight(0xa8d8ff, 0x4a3a1a, 0.75));
+    const sun = new THREE.DirectionalLight(0xfff2d0, 1.35);
+    sun.position.set(30, 45, 20);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    const s = sun.shadow.camera;
+    s.left = -40; s.right = 40; s.top = 40; s.bottom = -40; s.near = 1; s.far = 120;
+    sun.shadow.bias = -0.0005;
+    this.scene.add(sun);
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.15));
+
+    const sky = new THREE.Mesh(
+      new THREE.SphereGeometry(220, 32, 16),
+      new THREE.MeshBasicMaterial({ color: 0x87ceeb, side: THREE.BackSide, fog: false })
+    );
+    this.scene.add(sky);
+    this.scene.fog = new THREE.Fog(0xc8dff0, 60, 180);
+
+    const grassTex = this.makeNoiseTexture('#5d8a3a', '#4a7530');
+    grassTex.repeat.set(60, 60);
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(240, 240, 1, 1),
+      new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    this.scene.add(ground);
+
+    const dirtTex = this.makeNoiseTexture('#8b6f47', '#6e5537');
+    dirtTex.repeat.set(8, 8);
+    const dirt = new THREE.Mesh(
+      new THREE.CircleGeometry(22, 48),
+      new THREE.MeshStandardMaterial({ map: dirtTex, roughness: 1 })
+    );
+    dirt.rotation.x = -Math.PI / 2;
+    dirt.position.y = 0.01;
+    dirt.receiveShadow = true;
+    this.scene.add(dirt);
+
+    this.buildBarn(-14, 0, -14);
+    this.buildWorkshop(14, 0, -12);
+    this.buildSellStation(0, 0, -14);
+
+    for (let i = 0; i < 18; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = 28 + Math.random() * 35;
+      this.buildTree(Math.cos(a) * r, 0, Math.sin(a) * r);
+    }
+    this.buildFence();
+    for (let i = 0; i < 6; i++) {
+      const g = new THREE.Group();
+      const crate = new THREE.Mesh(
+        new THREE.BoxGeometry(0.9, 0.9, 0.9),
+        new THREE.MeshStandardMaterial({ color: 0x8b6f47, roughness: 0.9 })
+      );
+      crate.position.y = 0.45; crate.castShadow = true; crate.receiveShadow = true;
+      g.add(crate);
+      g.position.set(-18 + Math.random() * 4, 0, 6 + Math.random() * 4);
+      this.scene.add(g);
+    }
+    const cloudMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, fog: false });
+    for (let i = 0; i < 14; i++) {
+      const cloud = new THREE.Group();
+      for (let j = 0; j < 3; j++) {
+        const puff = new THREE.Mesh(new THREE.SphereGeometry(4 + Math.random() * 3, 8, 6), cloudMat);
+        puff.position.set((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 4);
+        cloud.add(puff);
+      }
+      cloud.position.set((Math.random() - 0.5) * 180, 40 + Math.random() * 20, (Math.random() - 0.5) * 180);
+      this.scene.add(cloud);
+    }
+  }
+  makeNoiseTexture(c1, c2) {
+    const size = 128;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = size;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = c1; ctx.fillRect(0, 0, size, size);
+    for (let i = 0; i < 2500; i++) {
+      ctx.fillStyle = Math.random() > 0.5 ? c2 : c1;
+      ctx.globalAlpha = 0.35;
+      ctx.fillRect(Math.random() * size, Math.random() * size, 2, 2);
+    }
+    ctx.globalAlpha = 1;
+    const tex = new THREE.CanvasTexture(cv);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+  }
+  buildBarn(x, y, z) {
+    const g = new THREE.Group();
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x9c3a2a, roughness: 0.9 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x5c2e1a, roughness: 0.85 });
+    const trimMat = new THREE.MeshStandardMaterial({ color: 0xf0e8d0, roughness: 0.85 });
+    const walls = new THREE.Mesh(new THREE.BoxGeometry(10, 6, 12), wallMat);
+    walls.position.y = 3; walls.castShadow = true; walls.receiveShadow = true;
+    g.add(walls);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(8.5, 3.2, 4), roofMat);
+    roof.position.y = 7.6; roof.rotation.y = Math.PI / 4; roof.castShadow = true;
+    g.add(roof);
+    const door = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.2, 0.2), trimMat);
+    door.position.set(0, 1.6, 6.05);
+    g.add(door);
+    g.position.set(x, y, z);
+    this.scene.add(g);
+  }
+  buildWorkshop(x, y, z) {
+    const g = new THREE.Group();
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x6e6e6e, roughness: 0.9 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.85 });
+    const box = new THREE.Mesh(new THREE.BoxGeometry(8, 4, 8), wallMat);
+    box.position.y = 2; box.castShadow = true; box.receiveShadow = true;
+    g.add(box);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(9, 0.4, 9), roofMat);
+    roof.position.y = 4.2; roof.castShadow = true;
+    g.add(roof);
+    g.position.set(x, y, z);
+    this.scene.add(g);
+  }
+  buildSellStation(x, y, z) {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: 0x8b7355 });
+    const counter = new THREE.Mesh(new THREE.BoxGeometry(3.5, 1.1, 1), mat);
+    counter.position.y = 0.55; counter.castShadow = true; counter.receiveShadow = true;
+    g.add(counter);
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.7, 0.1),
+      new THREE.MeshStandardMaterial({ color: 0xffd35c, emissive: 0x553300, emissiveIntensity: 0.4 }));
+    sign.position.set(0, 2.2, 0);
+    g.add(sign);
+    g.position.set(x, y, z);
+    this.scene.add(g);
+  }
+  buildTree(x, y, z) {
+    const g = new THREE.Group();
+    const trunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.28, 0.4, 3.2, 8),
+      new THREE.MeshStandardMaterial({ color: 0x5a3a1e, roughness: 1 })
+    );
+    trunk.position.y = 1.6; trunk.castShadow = true;
+    g.add(trunk);
+    for (let i = 0; i < 2; i++) {
+      const foliage = new THREE.Mesh(
+        new THREE.SphereGeometry(1.8 - i * 0.3, 8, 6),
+        new THREE.MeshStandardMaterial({ color: 0x2d5016 + i * 0x050500, roughness: 1 })
+      );
+      foliage.position.y = 3.6 + i * 1.1;
+      foliage.castShadow = true;
+      g.add(foliage);
+    }
+    g.position.set(x, y, z);
+    this.scene.add(g);
+  }
+  buildFence() {
+    const mat = new THREE.MeshStandardMaterial({ color: 0x8b7355, roughness: 1 });
+    const postGeo = new THREE.BoxGeometry(0.15, 1.3, 0.15);
+    const railGeo = new THREE.BoxGeometry(3.0, 0.1, 0.08);
+    const z = -22;
+    for (let i = -21; i <= 21; i += 3) {
+      const post = new THREE.Mesh(postGeo, mat);
+      post.position.set(i, 0.65, z); post.castShadow = true;
+      this.scene.add(post);
+      if (i < 21) {
+        for (const ry of [0.35, 0.9]) {
+          const rail = new THREE.Mesh(railGeo, mat);
+          rail.position.set(i + 1.5, ry, z); rail.castShadow = true;
+          this.scene.add(rail);
+        }
+      }
+    }
+  }
+}
+
+/* ==================== INPUT ==================== */
+class Input {
+  constructor() {
+    this.keys = {};
+    this.move = { x: 0, y: 0 };
+    this.look = { dx: 0, dy: 0 };
+    this.buttons = { sprint: false, crouch: false, jump: false };
+    this._jumpPressed = false;
+    this._actionPressed = false;
+    this.sensitivity = 0.0025;
+    this.setupKeyboard();
+  }
+  setupKeyboard() {
+    window.addEventListener('keydown', e => {
+      if (!this.keys[e.code]) {
+        if (e.code === 'Space') this._jumpPressed = true;
+        if (e.code === 'KeyE') this._actionPressed = true;
+      }
+      this.keys[e.code] = true;
+      if (['Space','KeyW','KeyA','KeyS','KeyD'].includes(e.code)) e.preventDefault();
+    });
+    window.addEventListener('keyup', e => { this.keys[e.code] = false; });
+  }
+  isDown(c) { return !!this.keys[c]; }
+  consumeJump() { const v = this._jumpPressed; this._jumpPressed = false; return v; }
+  consumeAction() { const v = this._actionPressed; this._actionPressed = false; return v; }
+  triggerAction() { this._actionPressed = true; }
+  triggerJump() { this._jumpPressed = true; }
+  getMoveVector() {
+    let x = this.move.x, y = this.move.y;
+    if (this.isDown('KeyW')) y -= 1;
+    if (this.isDown('KeyS')) y += 1;
+    if (this.isDown('KeyA')) x -= 1;
+    if (this.isDown('KeyD')) x += 1;
+    const len = Math.hypot(x, y);
+    if (len > 1) { x /= len; y /= len; }
+    return { x, y };
+  }
+  consumeLook() {
+    const dx = this.look.dx, dy = this.look.dy;
+    this.look.dx = 0; this.look.dy = 0;
+    return { dx, dy };
+  }
+}
+
+/* ==================== PLAYER ==================== */
+class Player {
+  constructor(camera, input) {
+    this.camera = camera; this.input = input;
+    this.position = new THREE.Vector3(0, 1.7, 8);
+    this.vy = 0; this.yaw = 0; this.pitch = -0.1;
+    this.walkSpeed = 4.0; this.sprintSpeed = 7.0; this.crouchSpeed = 2.0;
+    this.eyeHeight = 1.7; this.crouchHeight = 1.05;
+    this.currentHeight = this.eyeHeight;
+    this.onGround = true;
+    this.bobPhase = 0; this.bobIntensity = 0;
+    this.crouching = false;
+    this._shake = 0;
+    this.maxStamina = 100;
+    this.stamina = 100;
+    this.exhausted = false;
+  }
+  addShake(amount = 0.15) { this._shake = Math.min(0.5, this._shake + amount); }
+  setMaxStamina(v) {
+    const ratio = this.maxStamina > 0 ? this.stamina / this.maxStamina : 1;
+    this.maxStamina = v;
+    this.stamina = ratio * v;
+  }
+  drainStamina(n) { this.stamina = Math.max(0, this.stamina - n); this.exhausted = this.stamina <= 0; }
+  regenStamina(dt, rateMult = 1) {
+    const base = 6 * rateMult;
+    this.stamina = Math.min(this.maxStamina, this.stamina + base * dt);
+    if (this.stamina > 20) this.exhausted = false;
+  }
+  update(dt) {
+    const look = this.input.consumeLook();
+    if (look.dx || look.dy) {
+      this.yaw   -= look.dx * this.input.sensitivity;
+      this.pitch -= look.dy * this.input.sensitivity;
+    }
+    const arrowSpeed = 2.0 * dt;
+    if (this.input.isDown('ArrowLeft'))  this.yaw += arrowSpeed;
+    if (this.input.isDown('ArrowRight')) this.yaw -= arrowSpeed;
+    if (this.input.isDown('ArrowUp'))    this.pitch += arrowSpeed;
+    if (this.input.isDown('ArrowDown'))  this.pitch -= arrowSpeed;
+    this.pitch = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, this.pitch));
+
+    if (this.input.isDown('KeyC') || this.input.buttons.crouch) this.crouching = true;
+    else this.crouching = false;
+    const targetHeight = this.crouching ? this.crouchHeight : this.eyeHeight;
+    this.currentHeight += (targetHeight - this.currentHeight) * Math.min(1, dt * 12);
+
+    const mv = this.input.getMoveVector();
+    const wantSprint = (this.input.isDown('ShiftLeft') || this.input.buttons.sprint) && !this.crouching;
+    const canSprint = wantSprint && !this.exhausted && this.stamina > 5;
+    if (canSprint) this.drainStamina(dt * 15 * (this.maxStamina / 100));
+    const sprint = canSprint;
+    const speed = this.crouching ? this.crouchSpeed : (sprint ? this.sprintSpeed : this.walkSpeed);
+
+    const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+    const right   = new THREE.Vector3( Math.cos(this.yaw), 0, -Math.sin(this.yaw));
+    const move = new THREE.Vector3();
+    move.addScaledVector(forward, -mv.y);
+    move.addScaledVector(right,   mv.x);
+    const moving = move.lengthSq() > 0.001;
+    if (moving) move.normalize();
+    this.position.x += move.x * speed * dt;
+    this.position.z += move.z * speed * dt;
+
+    if (this.input.consumeJump() && this.onGround) { this.vy = 6.5; this.onGround = false; }
+    this.vy -= 22 * dt;
+    this.position.y += this.vy * dt;
+    if (this.position.y <= this.currentHeight) {
+      if (!this.onGround && this.vy < -4) this.addShake(0.1);
+      this.position.y = this.currentHeight;
+      this.vy = 0; this.onGround = true;
+    }
+
+    if (moving && this.onGround) {
+      this.bobPhase += dt * (sprint ? 13 : 9);
+      this.bobIntensity = Math.min(1, this.bobIntensity + dt * 4);
+    } else {
+      this.bobIntensity = Math.max(0, this.bobIntensity - dt * 4);
+    }
+    const bobY = Math.sin(this.bobPhase) * 0.055 * this.bobIntensity;
+    const bobX = Math.cos(this.bobPhase * 0.5) * 0.03 * this.bobIntensity;
+
+    this._shake = Math.max(0, this._shake - dt * 2);
+    const shakeX = (Math.random() - 0.5) * this._shake * 0.4;
+    const shakeY = (Math.random() - 0.5) * this._shake * 0.4;
+
+    this.camera.position.set(
+      this.position.x + bobX + shakeX,
+      this.position.y + bobY + shakeY,
+      this.position.z
+    );
+    this.camera.rotation.order = 'YXZ';
+    this.camera.rotation.y = this.yaw;
+    this.camera.rotation.x = this.pitch;
+  }
+  serialize() { return { position: this.position.toArray(), yaw: this.yaw, pitch: this.pitch, stamina: this.stamina, maxStamina: this.maxStamina }; }
+  deserialize(d) {
+    if (!d) return;
+    if (d.position) this.position.set(...d.position);
+    if (typeof d.yaw === 'number') this.yaw = d.yaw;
+    if (typeof d.pitch === 'number') this.pitch = d.pitch;
+    if (typeof d.maxStamina === 'number') this.maxStamina = d.maxStamina;
+    if (typeof d.stamina === 'number') this.stamina = d.stamina;
+  }
+}
+
+/* ==================== UI ==================== */
+class UI {
+  constructor(game) {
+    this.game = game;
+    this.el = {
+      money: document.getElementById('ui-money'),
+      level: document.getElementById('ui-level'),
+      xpFill: document.getElementById('ui-xp-fill'),
+      xpText: document.getElementById('ui-xp-text'),
+      tool: document.getElementById('ui-tool'),
+      dur: document.getElementById('ui-dur'),
+      staminaFill: document.getElementById('ui-stamina-fill'),
+      staminaText: document.getElementById('ui-stamina-text'),
+      invCount: document.getElementById('ui-inv-count'),
+      prompt: document.getElementById('prompt'),
+      crosshair: document.getElementById('crosshair'),
+      notifs: document.getElementById('notifications'),
+      tutorial: document.getElementById('tutorial'),
+      tutorialText: document.getElementById('tutorial-text'),
+      invPanel: document.getElementById('panel-inv'),
+      shopPanel: document.getElementById('panel-shop'),
+      settingsPanel: document.getElementById('panel-settings'),
+      skillsPanel: document.getElementById('panel-skills'),
+      missionsPanel: document.getElementById('panel-missions'),
+      machinesPanel: document.getElementById('panel-machines'),
+      statsPanel: document.getElementById('panel-stats'),
+      areasPanel: document.getElementById('panel-areas'),
+      achPanel: document.getElementById('panel-ach'),
+      invList: document.getElementById('inv-list'),
+      shopBody: document.getElementById('shop-body'),
+      skillsBody: document.getElementById('skills-body'),
+      missionsBody: document.getElementById('missions-body'),
+      machinesBody: document.getElementById('machines-body'),
+      statsBody: document.getElementById('stats-body'),
+      areasBody: document.getElementById('areas-body'),
+      achBody: document.getElementById('ach-body'),
+      saveToast: document.getElementById('save-toast'),
+      discovery: document.getElementById('discovery')
+    };
+    this.panelOpen = null;
+    this.tutorialTimer = 0;
+    this._hudTick = 0;
+    this.bindButtons();
+  }
+  bindButtons() {
+    const el = this.el;
+    const bind = (id, fn) => {
+      const b = document.getElementById(id);
+      if (!b) return;
+      b.addEventListener('click', e => { e.preventDefault(); fn(); });
+      b.addEventListener('touchstart', e => { e.preventDefault(); fn(); }, { passive:false });
+    };
+    bind('btn-inv',      () => this.togglePanel('inv'));
+    bind('btn-shop',     () => this.togglePanel('shop'));
+    bind('btn-settings', () => this.togglePanel('settings'));
+    bind('btn-skills',   () => this.togglePanel('skills'));
+    bind('btn-missions', () => this.togglePanel('missions'));
+    bind('btn-machines', () => this.togglePanel('machines'));
+    bind('btn-stats',    () => this.togglePanel('stats'));
+    bind('btn-areas',    () => this.togglePanel('areas'));
+    bind('btn-ach',      () => this.togglePanel('ach'));
+    document.querySelectorAll('.close-x').forEach(b => b.addEventListener('click', () => this.closeAll()));
+    document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', e => {
+      const parent = t.closest('.panel');
+      parent.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      this.renderTab(parent.id, t.dataset.tab);
+    }));
+
+    const action = document.getElementById('btn-action');
+    action.addEventListener('touchstart', e => { e.preventDefault(); this.game.doInteract(); }, { passive:false });
+    action.addEventListener('click', () => this.game.doInteract());
+
+    const jump = document.getElementById('btn-jump');
+    jump.addEventListener('touchstart', e => { e.preventDefault(); this.game.input.triggerJump(); }, { passive:false });
+    jump.addEventListener('click', () => this.game.input.triggerJump());
+
+    const sprint = document.getElementById('btn-sprint');
+    const setSprint = v => this.game.input.buttons.sprint = v;
+    sprint.addEventListener('touchstart', e => { e.preventDefault(); setSprint(true); }, { passive:false });
+    sprint.addEventListener('touchend', () => setSprint(false));
+    sprint.addEventListener('touchcancel', () => setSprint(false));
+
+    const crouch = document.getElementById('btn-crouch');
+    const toggleCrouch = () => {
+      this.game.input.buttons.crouch = !this.game.input.buttons.crouch;
+      crouch.style.background = this.game.input.buttons.crouch ? 'rgba(255,180,50,0.4)' : '';
+    };
+    crouch.addEventListener('click', toggleCrouch);
+    crouch.addEventListener('touchstart', e => { e.preventDefault(); toggleCrouch(); }, { passive:false });
+
+    const sens = document.getElementById('set-sens');
+    sens.addEventListener('input', () => { this.game.input.sensitivity = 0.00025 * parseInt(sens.value); this.game.saveSettings(); });
+    const fov = document.getElementById('set-fov');
+    fov.addEventListener('input', () => { this.game.camera.fov = parseInt(fov.value); this.game.camera.updateProjectionMatrix(); this.game.saveSettings(); });
+    const audioCb = document.getElementById('set-audio');
+    audioCb.addEventListener('change', () => { this.game.audio.enabled = audioCb.checked; this.game.saveSettings(); });
+    document.getElementById('btn-save').addEventListener('click', async () => { await this.game.saveGame(); this.notify('Game saved.', 'uncommon'); });
+    document.getElementById('btn-reset').addEventListener('click', async () => {
+      if (confirm('Reset ALL progress? Cannot be undone.')) {
+        await this.game.saveSystem.clear();
+        localStorage.removeItem('haystack-settings');
+        location.reload();
+      }
+    });
+  }
+  togglePanel(name) {
+    if (this.panelOpen === name) { this.closeAll(); return; }
+    this.closeAll();
+    this.panelOpen = name;
+    const map = {
+      inv:      [this.el.invPanel,      () => this.renderInventory()],
+      shop:     [this.el.shopPanel,     () => this.renderShop('sell')],
+      settings: [this.el.settingsPanel, () => this.fillSettings()],
+      skills:   [this.el.skillsPanel,   () => this.renderSkills()],
+      missions: [this.el.missionsPanel, () => this.renderMissions('active')],
+      machines: [this.el.machinesPanel, () => this.renderMachines()],
+      stats:    [this.el.statsPanel,    () => this.renderStats()],
+      areas:    [this.el.areasPanel,    () => this.renderAreas()],
+      ach:      [this.el.achPanel,      () => this.renderAchievements()]
+    };
+    const entry = map[name]; if (!entry) return;
+    entry[1]();
+    entry[0].classList.remove('hidden');
+    this.game.audio.play('click');
+  }
+  closeAll() {
+    for (const k of ['invPanel','shopPanel','settingsPanel','skillsPanel','missionsPanel','machinesPanel','statsPanel','areasPanel','achPanel'])
+      this.el[k].classList.add('hidden');
+    this.panelOpen = null;
+  }
+  renderTab(panelId, tab) {
+    if (panelId === 'panel-shop') return this.renderShop(tab);
+    if (panelId === 'panel-missions') return this.renderMissions(tab);
+  }
+  fillSettings() {
+    document.getElementById('set-sens').value = Math.round(this.game.input.sensitivity / 0.00025);
+    document.getElementById('set-fov').value = this.game.camera.fov;
+    document.getElementById('set-audio').checked = this.game.audio.enabled;
+  }
+  renderInventory() {
+    const inv = this.game.inventory;
+    const list = this.el.invList;
+    const cap = this.el.invCount;
+    if (cap) cap.textContent = `${inv.slots.length}/${inv.maxSlots}`;
+    if (inv.slots.length === 0) { list.innerHTML = '<div class="empty">Empty</div>'; return; }
+    list.innerHTML = inv.slots.map(s => {
+      const it = ITEMS[s.id]; if (!it) return '';
+      const unit = Math.floor(it.value * this.game.skills.sellPriceMult());
+      return `<div class="item-row rarity-${it.rarity}">
+        <div class="item-icon">${it.icon}</div>
+        <div class="item-info">
+          <div class="item-name">${it.name}</div>
+          <div class="item-desc">$${unit} ea · ${it.desc}</div>
+        </div>
+        <div class="item-qty">×${s.qty}</div>
+        <button class="item-action" data-sell="${s.id}">Sell</button>
+      </div>`;
+    }).join('');
+    list.querySelectorAll('[data-sell]').forEach(b => b.addEventListener('click', () => {
+      const id = b.dataset.sell;
+      const total = this.game.sellItem(id, this.game.inventory.count(id));
+      this.notify(`Sold for $${total}`, 'uncommon');
+      this.renderInventory();
+    }));
+  }
+  renderShop(tab) {
+    const body = this.el.shopBody;
+    if (tab === 'sell') {
+      const inv = this.game.inventory;
+      const sellable = inv.slots.filter(s => ITEMS[s.id]?.sellable);
+      if (sellable.length === 0) { body.innerHTML = '<div class="empty">Nothing to sell.</div>'; return; }
+      let total = 0, count = 0;
+      const rows = sellable.map(s => {
+        const it = ITEMS[s.id];
+        const unit = Math.floor(it.value * this.game.skills.sellPriceMult());
+        const sub = unit * s.qty; total += sub; count += s.qty;
+        return `<div class="item-row rarity-${it.rarity}">
+          <div class="item-icon">${it.icon}</div>
+          <div class="item-info"><div class="item-name">${it.name}</div>
+            <div class="item-desc">$${unit} × ${s.qty} = <b>$${sub}</b></div></div>
+          <button class="item-action" data-sell="${s.id}">Sell</button>
+        </div>`;
+      }).join('');
+      body.innerHTML = rows + `<button class="big-btn" id="do-sell">SELL ALL (${count}) — $${total}</button>`;
+      body.querySelectorAll('[data-sell]').forEach(b => b.addEventListener('click', () => {
+        const id = b.dataset.sell;
+        const t = this.game.sellItem(id, this.game.inventory.count(id));
+        this.notify(`Sold for $${t}`, 'uncommon');
+        this.renderShop('sell'); this.refresh();
+      }));
+      document.getElementById('do-sell').addEventListener('click', () => {
+        const earned = this.game.sellAll();
+        this.notify(`Sold for $${earned}`, 'uncommon');
+        this.renderShop('sell'); this.refresh();
+      });
+    } else if (tab === 'tools') {
+      const ts = this.game.toolSystem;
+      const current = this.game.state.toolId;
+      let html = '';
+      for (const t of Object.values(TOOLS)) {
+        const owned = ts.has(t.id);
+        const isCurrent = current === t.id;
+        const price = this.game.applyShopDiscount(t.price);
+        const canAfford = this.game.state.money >= price;
+        const dur = owned ? Math.round(ts.getDur(t.id)) : 0;
+        const maxDur = owned ? ts.getMaxDur(t.id) : t.maxDur;
+        const level = ts.getLevel(t.id);
+        let action = '';
+        if (t.id === 'hands') {
+          action = isCurrent ? '<button class="item-action" disabled>Equipped</button>' : `<button class="item-action" data-eq="${t.id}">Equip</button>`;
+        } else if (owned) {
+          action = isCurrent
+            ? `<button class="item-action" disabled>Equipped</button>`
+            : `<button class="item-action" data-eq="${t.id}">Equip</button>`;
+          const upg = UPGRADE_COST(t.price, level - 1);
+          if (level < UPGRADE_MAX) action += `<button class="item-action alt" data-upg="${t.id}" ${this.game.state.money >= upg ? '' : 'disabled'}>Upg $${upg}</button>`;
+          if (ts.getDur(t.id) < maxDur) {
+            const repCost = Math.ceil((maxDur - ts.getDur(t.id)) * 0.5 + t.price * 0.02);
+            action += `<button class="item-action alt" data-rep="${t.id}" ${this.game.state.money >= repCost ? '' : 'disabled'}>Rep $${repCost}</button>`;
+          }
+        } else {
+          action = `<button class="item-action" data-buy="${t.id}" ${canAfford ? '' : 'disabled'}>$${price}</button>`;
+        }
+        html += `<div class="item-row rarity-uncommon">
+          <div class="item-icon">${t.icon}</div>
+          <div class="item-info">
+            <div class="item-name">${t.name} ${owned ? `<small>T${t.tier} · Lv${level}</small>` : ''}</div>
+            <div class="item-desc">${t.desc} · Yield ${t.baseYield} · Speed ${t.speed.toFixed(2)}x${owned && maxDur ? ` · Dur ${dur}/${maxDur}` : ''}</div>
+          </div>
+          <div class="row-actions">${action}</div>
+        </div>`;
+      }
+      body.innerHTML = html;
+      body.querySelectorAll('[data-buy]').forEach(b => b.addEventListener('click', () => {
+        const id = b.dataset.buy; const t = TOOLS[id];
+        const price = this.game.applyShopDiscount(t.price);
+        if (this.game.state.money < price) return;
+        this.game.state.money -= price;
+        this.game.statistics.inc('moneySpent', price);
+        this.game.statistics.inc('toolsBought', 1);
+        this.game.toolSystem.buy(id);
+        this.game.state.toolId = id;
+        this.game.statistics.inc('upgradesApplied', 1);
+        this.game.audio.play('buy');
+        this.notify(`Bought ${t.name}`, 'rare');
+        this.game.checkProgress();
+        this.refresh(); this.renderShop('tools');
+      }));
+      body.querySelectorAll('[data-upg]').forEach(b => b.addEventListener('click', () => {
+        const id = b.dataset.upg;
+        const lvl = ts.getLevel(id);
+        const cost = UPGRADE_COST(TOOLS[id].price, lvl - 1);
+        if (this.game.state.money < cost) return;
+        this.game.state.money -= cost;
+        this.game.statistics.inc('moneySpent', cost);
+        this.game.statistics.inc('upgradesApplied', 1);
+        ts.upgrade(id);
+        this.game.audio.play('buy');
+        this.notify(`Upgraded ${TOOLS[id].name} → Lv${ts.getLevel(id)}`, 'epic');
+        this.game.checkProgress();
+        this.refresh(); this.renderShop('tools');
+      }));
+      body.querySelectorAll('[data-rep]').forEach(b => b.addEventListener('click', () => {
+        const id = b.dataset.rep;
+        const max = ts.getMaxDur(id);
+        const cost = Math.ceil((max - ts.getDur(id)) * 0.5 + TOOLS[id].price * 0.02);
+        if (this.game.state.money < cost) return;
+        this.game.state.money -= cost;
+        this.game.statistics.inc('moneySpent', cost);
+        ts.repair(id);
+        this.game.audio.play('buy');
+        this.notify(`Repaired ${TOOLS[id].name}`, 'uncommon');
+        this.refresh(); this.renderShop('tools');
+      }));
+      body.querySelectorAll('[data-eq]').forEach(b => b.addEventListener('click', () => {
+        this.game.state.toolId = b.dataset.eq;
+        this.game.audio.play('click');
+        this.refresh(); this.renderShop('tools');
+      }));
+    } else if (tab === 'machines') {
+      const lvl = this.game.state.level;
+      body.innerHTML = Object.values(MACHINE_TYPES).map(t => {
+        const price = this.game.applyShopDiscount(t.price);
+        const owned = this.game.machines.machines.filter(m => m.type.id === t.id).length;
+        const canBuy = lvl >= t.reqLevel && this.game.state.money >= price;
+        return `<div class="item-row rarity-epic">
+          <div class="item-icon">${t.icon}</div>
+          <div class="item-info">
+            <div class="item-name">${t.name} ${owned ? `<small>Owned ×${owned}</small>` : ''}</div>
+            <div class="item-desc">${t.desc}<br>Rate ${t.baseRate}/s · Cap ${t.baseCapacity} · Req Lv${t.reqLevel}</div>
+          </div>
+          <button class="item-action" data-bm="${t.id}" ${canBuy ? '' : 'disabled'}>$${price}</button>
+        </div>`;
+      }).join('');
+      body.querySelectorAll('[data-bm]').forEach(b => b.addEventListener('click', () => {
+        const id = b.dataset.bm; const t = MACHINE_TYPES[id];
+        const price = this.game.applyShopDiscount(t.price);
+        if (this.game.state.money < price) return;
+        const pile = this.game.hayPiles.find(p => p.remaining > 0);
+        if (!pile) { this.notify('No hay pile available.', 'rare'); return; }
+        const r = this.game.machines.install(id, pile);
+        if (!r.ok) { this.notify(r.reason || 'Cannot install.', 'rare'); return; }
+        this.game.statistics.inc('moneySpent', price);
+        this.game.audio.play('buy');
+        this.refresh(); this.renderShop('machines');
+      }));
+    }
+  }
+  renderSkills() {
+    const tree = this.game.skills;
+    const body = this.el.skillsBody;
+    let html = `<div class="skills-head">Skill Points: <b>${tree.points}</b></div>`;
+    for (const cat of SKILL_CATEGORIES) {
+      const list = Object.entries(SKILLS).filter(([, s]) => s.cat === cat.id);
+      if (!list.length) continue;
+      html += `<div class="skill-cat"><h3>${cat.icon} ${cat.name}</h3>`;
+      for (const [id, s] of list) {
+        const lvl = tree.getLevel(id);
+        const check = tree.canBuy(id, this.game.state.level);
+        const locked = lvl === 0 && !check.ok;
+        html += `<div class="skill-row ${locked ? 'locked' : ''}">
+          <div class="skill-icon">${s.icon}</div>
+          <div class="skill-info">
+            <div class="skill-name">${s.name} <small>${lvl}/${s.max}</small></div>
+            <div class="skill-desc">${s.desc}</div>
+            <div class="skill-req">${s.reqLvl > 1 ? `Req Lv${s.reqLvl}` : ''}${s.requires.length ? ' · After: ' + s.requires.map(r => SKILLS[r].name).join(', ') : ''}</div>
+          </div>
+          <button class="skill-buy" data-skill="${id}" ${check.ok ? '' : 'disabled'}>${lvl >= s.max ? 'MAX' : `${s.cost} SP`}</button>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+    body.innerHTML = html;
+    body.querySelectorAll('[data-skill]').forEach(b => b.addEventListener('click', () => {
+      const id = b.dataset.skill;
+      const r = tree.buy(id, this.game.state.level);
+      if (!r.ok) { this.notify(r.reason || 'Cannot buy.', 'rare'); this.game.audio.play('error'); return; }
+      this.game.audio.play('skillBuy');
+      this.notify(`✦ Learned ${SKILLS[id].name} Lv${tree.getLevel(id)}`, 'epic');
+      this.game.player.setMaxStamina(100 + this.game.skills.maxStaminaBonus());
+      this.refresh(); this.renderSkills();
+      this.game.saveGame();
+    }));
+  }
+  renderMissions(tab) {
+    const body = this.el.missionsBody;
+    const ms = this.game.missions;
+    const list = MISSIONS.filter(m => tab === 'active' ? !ms.claimed[m.id] : ms.claimed[m.id]);
+    if (!list.length) { body.innerHTML = `<div class="empty">No missions.</div>`; return; }
+    body.innerHTML = list.map(m => {
+      const p = Math.min(ms.getProgress(m), m.target);
+      const pct = (p / m.target) * 100;
+      const canClaim = ms.canClaim(m);
+      return `<div class="mission-row">
+        <div class="mission-title">${m.title}</div>
+        <div class="mission-desc">${m.desc}</div>
+        <div class="mission-progress"><div class="bar"><div class="fill" style="width:${pct}%"></div></div><span>${p}/${m.target}</span></div>
+        <div class="mission-reward">
+          ${m.reward.xp ? `+${m.reward.xp} XP` : ''} ${m.reward.money ? `+$${m.reward.money}` : ''}
+          ${ms.claimed[m.id] ? '<span class="badge">Claimed</span>' :
+            canClaim ? `<button class="item-action" data-claim="${m.id}">CLAIM</button>` : '<span class="badge wait">In Progress</span>'}
+        </div>
+      </div>`;
+    }).join('');
+    body.querySelectorAll('[data-claim]').forEach(b => b.addEventListener('click', () => {
+      this.game.missions.claim(b.dataset.claim);
+      this.refresh(); this.renderMissions(tab);
+    }));
+  }
+  renderMachines() {
+    const mm = this.game.machines;
+    const body = this.el.machinesBody;
+    if (!mm.machines.length) { body.innerHTML = '<div class="empty">No machines. Buy one from Shop → Machines.</div>'; return; }
+    body.innerHTML = mm.machines.map((m, i) => {
+      const pct = Math.min(100, (m.storage.hay / m.capacity) * 100);
+      return `<div class="machine-row">
+        <div class="machine-head"><span class="mi">${m.type.icon}</span> ${m.type.name} <small>Lv${m.level}</small></div>
+        <div class="machine-stat">Status: <b>${m.running ? 'Working' : 'Stopped'}</b></div>
+        <div class="machine-stat">Hay: ${m.storage.hay} / ${m.capacity}</div>
+        <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+        <div class="machine-stat">Items held: ${Object.values(m.itemsFound).reduce((a,n)=>a+n,0)}</div>
+        <div class="machine-actions">
+          <button class="item-action" data-mstop="${i}">${m.running ? 'Stop' : 'Start'}</button>
+          <button class="item-action" data-mcollect="${i}">Collect</button>
+          <button class="item-action alt" data-mupg="${i}" ${this.game.state.money >= m.upgradeCost() ? '' : 'disabled'}>Upg $${m.upgradeCost()}</button>
+        </div>
+      </div>`;
+    }).join('');
+    body.querySelectorAll('[data-mstop]').forEach(b => b.addEventListener('click', () => {
+      const m = mm.machines[+b.dataset.mstop];
+      m.running = !m.running;
+      this.renderMachines(); this.game.audio.play('click');
+    }));
+    body.querySelectorAll('[data-mcollect]').forEach(b => b.addEventListener('click', () => {
+      mm.collect(mm.machines[+b.dataset.mcollect]); this.renderMachines(); this.refresh();
+    }));
+    body.querySelectorAll('[data-mupg]').forEach(b => b.addEventListener('click', () => {
+      const m = mm.machines[+b.dataset.mupg];
+      const cost = m.upgradeCost();
+      if (this.game.state.money < cost) return;
+      this.game.state.money -= cost;
+      this.game.statistics.inc('moneySpent', cost);
+      m.upgrade();
+      this.game.audio.play('buy');
+      this.notify(`${m.type.name} → Lv${m.level}`, 'epic');
+      this.renderMachines(); this.refresh();
+    }));
+  }
+  renderStats() {
+    const s = this.game.statistics.data;
+    const rows = [
+      ['Play time',         this._fmtTime(s.playTime)],
+      ['Level',             this.game.state.level],
+      ['XP earned',         Math.floor(s.xpEarned)],
+      ['Searches',          s.searches],
+      ['Hay removed',       s.hayRemoved],
+      ['Items found',       s.itemsFound],
+      ['Items sold',        s.itemsSold],
+      ['Rare finds',        s.rareFound],
+      ['Epic finds',        s.epicFound],
+      ['Legendary finds',   s.legendaryFound],
+      ['Mythic finds',      s.mythicFound],
+      ['Needles found',     s.needlesFound],
+      ['Money earned',      '$' + Math.floor(s.moneyEarned)],
+      ['Money spent',       '$' + Math.floor(s.moneySpent)],
+      ['Tools bought',      s.toolsBought],
+      ['Upgrades applied',  s.upgradesApplied],
+      ['Machines built',    s.machinesBuilt],
+      ['Missions done',     s.missionsCompleted],
+      ['Areas unlocked',    s.areasUnlocked]
+    ];
+    this.el.statsBody.innerHTML = rows.map(([k,v]) =>
+      `<div class="stat-row"><span>${k}</span><b>${v}</b></div>`).join('');
+  }
+  _fmtTime(sec) {
+    sec = Math.floor(sec);
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    return `${h}h ${m}m ${s}s`;
+  }
+  renderAreas() {
+    const body = this.el.areasBody;
+    body.innerHTML = AREAS.map(a => {
+      const unlocked = this.game.areas.unlocked[a.id];
+      const current = this.game.areas.current === a.id;
+      const check = this.game.areas.canUnlock(a.id);
+      const btn = current
+        ? `<button class="item-action" disabled>Current</button>`
+        : unlocked
+          ? `<button class="item-action" data-enter="${a.id}">Enter</button>`
+          : `<button class="item-action" data-unlock="${a.id}" ${check.ok ? '' : 'disabled'}>Unlock $${a.reqMoney}</button>`;
+      return `<div class="area-row ${unlocked ? '' : 'locked'}">
+        <div class="area-head">${a.name} <small>Lv${a.reqLevel} · ${a.difficulty}</small></div>
+        <div class="area-desc">${a.desc}</div>
+        <div class="area-stats">${a.piles} piles × ${a.hayPerPile} hay · Rare ×${a.rareMult}</div>
+        ${btn}
+      </div>`;
+    }).join('');
+    body.querySelectorAll('[data-enter]').forEach(b => b.addEventListener('click', () => {
+      this.game.switchArea(b.dataset.enter); this.closeAll();
+    }));
+    body.querySelectorAll('[data-unlock]').forEach(b => b.addEventListener('click', () => {
+      const r = this.game.areas.unlock(b.dataset.unlock);
+      if (!r.ok) { this.notify(r.reason, 'rare'); return; }
+      this.game.statistics.inc('moneySpent', AREAS.find(a => a.id === b.dataset.unlock).reqMoney);
+      this.renderAreas(); this.refresh();
+    }));
+  }
+  renderAchievements() {
+    const body = this.el.achBody;
+    const unlocked = this.game.achievements.unlocked;
+    body.innerHTML = ACHIEVEMENTS.map(a => {
+      const on = !!unlocked[a.id];
+      const cur = a.stat === '__level' ? this.game.state.level : this.game.statistics.get(a.stat);
+      const pct = Math.min(100, (cur / a.target) * 100);
+      return `<div class="ach-row ${on ? 'unlocked' : ''}">
+        <div class="ach-icon">${a.icon}</div>
+        <div class="ach-info">
+          <div class="ach-name">${a.name}</div>
+          <div class="ach-desc">${a.desc}</div>
+          <div class="bar small"><div class="fill" style="width:${pct}%"></div></div>
+          <div class="ach-prog">${Math.min(cur,a.target)} / ${a.target}</div>
+        </div>
+        <div class="ach-badge">${on ? '✓' : ''}</div>
+      </div>`;
+    }).join('');
+  }
+  refresh() {
+    const s = this.game.state;
+    const ts = this.game.toolSystem;
+    const toolId = s.toolId;
+    const t = TOOLS[toolId];
+    const need = this.game.xpForLevel(s.level);
+    this.el.money.textContent = Math.floor(s.money);
+    this.el.level.textContent = 'Lv.' + s.level;
+    this.el.xpFill.style.width = Math.min(100, (s.xp / need) * 100) + '%';
+    this.el.xpText.textContent = `${Math.floor(s.xp)}/${need}`;
+    this.el.tool.textContent = t ? t.name : 'Bare Hands';
+    if (t && t.maxDur > 0) {
+      const d = Math.round(ts.getDur(toolId));
+      const m = ts.getMaxDur(toolId);
+      this.el.dur.textContent = `🔧 ${d}/${m}` + (ts.isBroken(toolId) ? ' (BROKEN)' : '');
+    } else this.el.dur.textContent = '';
+    if (this.el.invCount) this.el.invCount.textContent = `${this.game.inventory.slots.length}/${this.game.inventory.maxSlots}`;
+    if (this.panelOpen === 'inv') this.renderInventory();
+    if (this.panelOpen === 'skills') this.renderSkills();
+    if (this.panelOpen === 'missions') this.renderMissions('active');
+    if (this.panelOpen === 'machines') this.renderMachines();
+    if (this.panelOpen === 'stats') this.renderStats();
+    if (this.panelOpen === 'areas') this.renderAreas();
+    if (this.panelOpen === 'ach') this.renderAchievements();
+  }
+  tick(dt) {
+    this._hudTick += dt;
+    if (this._hudTick < 0.15) return;
+    this._hudTick = 0;
+    const p = this.game.player;
+    const pct = (p.stamina / p.maxStamina) * 100;
+    if (this.el.staminaFill) this.el.staminaFill.style.width = pct + '%';
+    if (this.el.staminaText) this.el.staminaText.textContent = `⚡ ${Math.round(p.stamina)}/${Math.round(p.maxStamina)}`;
+  }
+  updatePrompt(target) {
+    if (target) {
+      this.el.prompt.classList.remove('hidden');
+      this.el.crosshair.classList.add('target');
+    } else {
+      this.el.prompt.classList.add('hidden');
+      this.el.crosshair.classList.remove('target');
+    }
+  }
+  notify(msg, rarity = 'common') {
+    const d = document.createElement('div');
+    d.className = 'notif rarity-' + rarity;
+    d.textContent = msg;
+    this.el.notifs.appendChild(d);
+    setTimeout(() => { d.style.opacity = '0'; d.style.transition = 'opacity 0.3s'; }, 2200);
+    setTimeout(() => d.remove(), 2600);
+  }
+  discoveryPopup(item, qty) {
+    const d = this.el.discovery;
+    if (!d) return;
+    if (!['rare','epic','legendary','mythic'].includes(item.rarity)) return;
+    d.innerHTML = `<div class="disc-inner rarity-${item.rarity}">
+      <div class="disc-icon">${item.icon}</div>
+      <div class="disc-title">${RARITIES[item.rarity].name.toUpperCase()} FIND!</div>
+      <div class="disc-name">${item.name} ${qty > 1 ? '×'+qty : ''}</div>
+      <div class="disc-val">+${RARITIES[item.rarity].xp * qty} XP</div>
+    </div>`;
+    d.classList.remove('hidden');
+    d.classList.remove('play'); void d.offsetWidth; d.classList.add('play');
+    setTimeout(() => d.classList.add('hidden'), 1400);
+  }
+  levelUpFlash() {
+    document.body.classList.add('level-flash');
+    setTimeout(() => document.body.classList.remove('level-flash'), 800);
+  }
+  saveFlash(text, fading) {
+    const t = this.el.saveToast; if
