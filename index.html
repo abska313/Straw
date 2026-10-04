@@ -1,2338 +1,1090 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#facc15">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>HAYSTACK 3D - Ultimate Simulator</title>
+<!-- ============================================================
+  HAYSTACK — v0.1.0 (المرحلة الأولى)
+  محرك: Three.js (WebGL) — ملف واحد منظم بوحدات/كلاسات
 
-  <!-- Dynamic Web App Manifest Injection -->
-  <link rel="manifest" id="manifest-placeholder">
+  خريطة البنية (تطابق هيكل المشروع المستقبلي متعدد الملفات):
+  [CORE]     => EventBus, helpers, RNG, config
+  [PLAYER]   => PlayerController, InputSystem (joystick/look/buttons)
+  [WORLD]    => WorldBuilder (مزرعة، حظيرة، متجر، منصة بيع، أشجار، سياج)
+  [HAY]      => HaySystem (InstancedMesh + Object pooling + Spatial query)
+  [ITEMS]    => ITEMS DB, RARITY, ToolView (الأيدي والأدوات)
+  [INVENTORY]=> Inventory (فتحات، تكديس، وزن، ندرة)
+  [TOOLS]    => TOOLS DB + شراء/ترقية/تجهيز فعلي
+  [ECONOMY]  => Shop, SellStation, money
+  [MISSIONS] => Missions (تتبع حقيقي + مكافآت)
+  [AUDIO]    => AudioSys (WebAudio إجرائي: خطوات، قش، بيع، نادر، محيط)
+  [UI]       => UIManager (HUD, modals, toasts, discovery)
+  [SAVE]     => SaveSystem (IndexedDB + fallback LocalStorage)
+  [PWA]      => جاهز لربط manifest.json + service-worker.js (المرحلة 2)
+  الأنظمة القادمة لها نقاط توسعة جاهزة: [SKILLS] [MACHINES]
+  [AUTOMATION] [EVENTS] — لا تُحذف أي ميزة موجودة عند الإضافة.
+============================================================ -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1b130a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>HAYSTACK — محاكي البحث في القش</title>
+<style>
+@import url("https://cdn.jsdelivr.net/fontsource/fonts/cairo@latest/arabic-400-normal.css");
+@import url("https://cdn.jsdelivr.net/fontsource/fonts/cairo@latest/arabic-700-normal.css");
+@import url("https://cdn.jsdelivr.net/fontsource/fonts/cairo@latest/arabic-900-normal.css");
+:root{
+  --amber:#ffb52e; --amber2:#ff8c1a; --green:#7ec850; --panel:#1c150dee;
+  --panel2:#241a10ee; --line:#5a442666; --txt:#f5e9d0; --dim:#c9b490;
+  --rc:#9aa4ad;--ru:#4caf50;--rr:#2f9bff;--re:#c05cff;--rl:#ff9800;--rm:#ff4d5e;
+  --sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);
+  --sal:env(safe-area-inset-left,0px);--sar:env(safe-area-inset-right,0px);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+html,body{width:100%;height:100%;overflow:hidden;background:#0d0a06;font-family:'Cairo',system-ui,sans-serif;color:var(--txt);touch-action:none;overscroll-behavior:none}
+canvas{display:block}
+#app{position:fixed;inset:0}
+#app canvas{position:absolute;inset:0;z-index:0}
+#touch-layer{position:absolute;inset:0;z-index:1}
+button{font-family:inherit;color:inherit;border:none;background:none;cursor:pointer}
+.hide{display:none!important}
 
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      user-select: none;
-      -webkit-user-select: none;
-      touch-action: none;
-    }
-    body, html {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background-color: #111827;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    }
-    #game-canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 1;
-    }
+/* ---------- HUD ---------- */
+#hud{position:absolute;inset:0;z-index:4;pointer-events:none}
+#hud .chip{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:4px 12px;backdrop-filter:blur(6px);display:flex;align-items:center;gap:8px;font-weight:700}
+#top-bar{position:absolute;top:calc(8px + var(--sat));right:calc(10px + var(--sar));left:calc(10px + var(--sal));display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+#stat-group{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+#money-chip{color:#ffd76a;font-size:16px}
+#lvl-chip{flex-direction:column;align-items:flex-start;gap:2px;padding:4px 12px;font-size:12px}
+#xp-bar{width:110px;height:6px;background:#0008;border-radius:4px;overflow:hidden}
+#xp-fill{height:100%;width:0%;background:linear-gradient(90deg,#7ec850,#c8ff5e);border-radius:4px;transition:width .3s}
+#stamina-wrap{flex-direction:column;align-items:flex-start;gap:2px;padding:4px 12px;font-size:11px}
+#sta-bar{width:90px;height:7px;background:#0008;border-radius:4px;overflow:hidden}
+#sta-fill{height:100%;width:100%;background:linear-gradient(90deg,#38c8f0,#7ef0ff);border-radius:4px}
+#sta-fill.low{background:linear-gradient(90deg,#ff5b4d,#ff9d5c)}
+#tool-chip{font-size:12px;color:var(--dim)}
+#tool-chip b{color:var(--amber)}
+#menu-col{display:flex;flex-direction:column;gap:8px;pointer-events:auto}
+.menu-btn{width:46px;height:46px;border-radius:14px;background:var(--panel);border:1px solid var(--line);font-size:20px;display:flex;align-items:center;justify-content:center;position:relative;backdrop-filter:blur(6px)}
+.menu-btn:active{transform:scale(.92);background:var(--panel2)}
+.badge{position:absolute;top:-3px;left:-3px;width:12px;height:12px;border-radius:50%;background:#ff5252;border:2px solid #1c150d;display:none}
+.badge.on{display:block}
+#crosshair{position:absolute;top:50%;left:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:#ffffffcc;box-shadow:0 0 6px #000a}
+#prompt{position:absolute;bottom:calc(172px + var(--sab));left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--amber);color:var(--amber);border-radius:20px;padding:6px 18px;font-weight:700;font-size:14px;display:none;white-space:nowrap;animation:pulse 1.4s infinite;backdrop-filter:blur(6px)}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 #ffb52e55}50%{box-shadow:0 0 0 9px #ffb52e00}}
 
-    /* HUD Layer */
-    #hud-layer {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 10;
-      pointer-events: none;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      padding: env(safe-area-inset-top, 12px) env(safe-area-inset-right, 12px) env(safe-area-inset-bottom, 12px) env(safe-area-inset-left, 12px);
-    }
-    .hud-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      width: 100%;
-      gap: 8px;
-    }
-    .hud-group {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .stat-pill {
-      background: rgba(17, 24, 39, 0.9);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 16px;
-      padding: 5px 12px;
-      color: #fff;
-      font-size: 13px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      backdrop-filter: blur(8px);
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
-    }
-    .stat-pill.money { color: #4ade80; border-color: rgba(74, 222, 128, 0.4); }
-    .stat-pill.hay { color: #facc15; border-color: rgba(250, 204, 21, 0.4); }
-    .stat-pill.level {
-      color: #c084fc;
-      border-color: rgba(192, 132, 252, 0.4);
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 2px;
-      min-width: 110px;
-    }
-    .xp-bar-bg {
-      width: 100%;
-      height: 5px;
-      background: rgba(255, 255, 255, 0.15);
-      border-radius: 4px;
-      overflow: hidden;
-    }
-    .xp-bar-fill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, #c084fc, #e879f9);
-      transition: width 0.3s ease;
-    }
+/* ---------- أزرار التحكم ---------- */
+#joy-zone{position:absolute;left:0;bottom:0;width:44vw;height:62vh;z-index:2}
+#joy-base{position:absolute;width:118px;height:118px;border-radius:50%;background:#ffffff14;border:2px solid #ffffff30;display:none;transform:translate(-50%,-50%)}
+#joy-knob{position:absolute;width:54px;height:54px;border-radius:50%;background:#ffcf7acc;border:2px solid #fff8;transform:translate(-50%,-50%);box-shadow:0 4px 12px #0007}
+#btn-cluster{position:absolute;right:calc(12px + var(--sar));bottom:calc(14px + var(--sab));z-index:3;display:grid;grid-template-columns:repeat(2,64px);grid-auto-rows:64px;gap:10px}
+.cbtn{border-radius:50%;background:#1c150dcc;border:2px solid #5a4426aa;color:var(--txt);font-size:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(4px);touch-action:none}
+.cbtn small{font-size:9px;font-weight:700;opacity:.85}
+.cbtn:active,.cbtn.active{background:#ffb52e33;border-color:var(--amber);transform:scale(.94)}
+#btn-action{position:absolute;right:calc(96px + var(--sar));bottom:calc(84px + var(--sab));width:84px;height:84px;border-radius:50%;background:linear-gradient(160deg,#ffb52e,#ff8c1a);color:#3a2405;font-size:30px;border:3px solid #ffe0a0;box-shadow:0 6px 18px #0009;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:3;touch-action:none}
+#btn-action small{font-size:10px;font-weight:900}
+#btn-action:active{transform:scale(.93)}
 
-    /* Menu Buttons */
-    .menu-btn {
-      pointer-events: auto;
-      background: rgba(30, 41, 59, 0.9);
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      color: #fff;
-      border-radius: 14px;
-      padding: 6px 10px;
-      font-size: 11px;
-      font-weight: bold;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      cursor: pointer;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
-      position: relative;
-    }
-    .menu-btn:active { transform: scale(0.95); }
-    .badge-dot {
-      width: 8px;
-      height: 8px;
-      background-color: #ef4444;
-      border-radius: 50%;
-      position: absolute;
-      top: -2px;
-      right: -2px;
-      display: none;
-      box-shadow: 0 0 6px #ef4444;
-    }
+/* ---------- الدرس ---------- */
+#tut-bar{position:absolute;top:calc(64px + var(--sat));left:50%;transform:translateX(-50%);z-index:4;background:var(--panel2);border:1px solid var(--amber);border-radius:16px;padding:8px 16px;display:flex;align-items:center;gap:12px;max-width:88vw;backdrop-filter:blur(8px)}
+#tut-text{font-size:13px;font-weight:700}
+#tut-skip{pointer-events:auto;font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:10px;padding:3px 10px}
+#tut-dots{display:flex;gap:4px}
+#tut-dots i{width:7px;height:7px;border-radius:50%;background:#5a4426}
+#tut-dots i.done{background:var(--amber)}
 
-    /* Event Notification Banner */
-    #event-banner {
-      position: absolute;
-      top: 55px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: linear-gradient(90deg, rgba(234, 179, 8, 0.95), rgba(202, 138, 4, 0.95));
-      border: 1.5px solid #fef08a;
-      border-radius: 20px;
-      padding: 6px 18px;
-      color: #0f172a;
-      font-size: 12px;
-      font-weight: 800;
-      display: none;
-      align-items: center;
-      gap: 8px;
-      z-index: 50;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.5);
-      animation: pulse 1.8s infinite;
-      white-space: nowrap;
-    }
-    @keyframes pulse {
-      0%, 100% { transform: translateX(-50%) scale(1); }
-      50% { transform: translateX(-50%) scale(1.03); }
-    }
+/* ---------- toasts ---------- */
+#toasts{position:absolute;top:calc(100px + var(--sat));left:50%;transform:translateX(-50%);z-index:9;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+.toast{background:#1c150df0;border:1px solid var(--line);border-radius:14px;padding:6px 16px;font-size:13px;font-weight:700;animation:tin .25s ease;max-width:82vw;text-align:center}
+.toast.gold{border-color:var(--amber);color:var(--amber)}
+.toast.bad{border-color:#ff5252;color:#ff8a80}
+@keyframes tin{from{opacity:0;transform:translateY(-8px)}to{opacity:1}}
 
-    /* Interaction Prompt */
-    #crosshair {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 6px;
-      height: 6px;
-      background: rgba(255, 255, 255, 0.75);
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 5;
-    }
-    #interaction-prompt {
-      position: absolute;
-      top: 58%;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(15, 23, 42, 0.94);
-      border: 1.5px solid #facc15;
-      border-radius: 12px;
-      padding: 6px 18px;
-      color: #fff;
-      font-size: 13px;
-      font-weight: 700;
-      display: none;
-      align-items: center;
-      gap: 8px;
-      backdrop-filter: blur(8px);
-      box-shadow: 0 6px 20px rgba(0,0,0,0.6);
-      z-index: 10;
-      white-space: nowrap;
-    }
+/* ---------- اكتشاف نادر ---------- */
+#discovery{position:absolute;inset:0;z-index:12;display:flex;align-items:center;justify-content:center;background:#000000aa;opacity:0;pointer-events:none;transition:opacity .3s}
+#discovery.on{opacity:1}
+#disc-card{background:linear-gradient(160deg,#2a1f12,#171009);border:2px solid var(--rc);border-radius:22px;padding:22px 40px;text-align:center;position:relative;overflow:hidden;animation:dpop .5s cubic-bezier(.2,1.6,.4,1)}
+@keyframes dpop{from{transform:scale(.5);opacity:0}}
+#disc-card .shine{position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,#ffffff33 50%,transparent 70%);animation:shine 1.6s infinite}
+@keyframes shine{from{transform:translateX(-120%)}to{transform:translateX(120%)}}
+#disc-icon{font-size:56px;filter:drop-shadow(0 0 14px currentColor)}
+#disc-rarity{font-size:12px;font-weight:900;letter-spacing:2px}
+#disc-name{font-size:22px;font-weight:900;margin:4px 0}
+#disc-desc{font-size:12px;color:var(--dim)}
 
-    /* Mobile Controls */
-    #mobile-controls {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 8;
-      pointer-events: none;
-    }
-    #touch-look-zone {
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 50%;
-      height: 100%;
-      pointer-events: auto;
-    }
-    #joystick-container {
-      position: absolute;
-      bottom: 24px;
-      left: 24px;
-      width: 120px;
-      height: 120px;
-      background: rgba(255, 255, 255, 0.08);
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      border-radius: 50%;
-      pointer-events: auto;
-      touch-action: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    #joystick-knob {
-      width: 50px;
-      height: 50px;
-      background: radial-gradient(circle, #facc15 15%, #ca8a04 90%);
-      border-radius: 50%;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
-      transform: translate(0px, 0px);
-      pointer-events: none;
-    }
-    .action-buttons-group {
-      position: absolute;
-      bottom: 18px;
-      right: 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      align-items: flex-end;
-      pointer-events: auto;
-    }
-    .hud-btn-row { display: flex; gap: 8px; }
-    .hud-btn {
-      width: 58px;
-      height: 58px;
-      border-radius: 50%;
-      background: rgba(30, 41, 59, 0.9);
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      color: #fff;
-      font-size: 10px;
-      font-weight: 700;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
-      cursor: pointer;
-      touch-action: none;
-      transition: transform 0.08s;
-    }
-    .hud-btn:active { transform: scale(0.92); }
-    .hud-btn.primary {
-      width: 72px;
-      height: 72px;
-      background: linear-gradient(135deg, #eab308, #ca8a04);
-      border-color: #fef08a;
-      color: #1f2937;
-      font-size: 13px;
-    }
-
-    /* Modals & Dialogs */
-    .modal {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%) scale(0.95);
-      background: rgba(15, 23, 42, 0.96);
-      border: 1px solid rgba(250, 204, 21, 0.4);
-      border-radius: 18px;
-      width: 92%;
-      max-width: 480px;
-      max-height: 86vh;
-      color: #fff;
-      z-index: 100;
-      padding: 16px;
-      display: none;
-      flex-direction: column;
-      gap: 12px;
-      box-shadow: 0 20px 45px rgba(0,0,0,0.8);
-      backdrop-filter: blur(14px);
-      pointer-events: auto;
-      opacity: 0;
-      transition: opacity 0.2s, transform 0.2s;
-    }
-    .modal.active {
-      display: flex;
-      opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
-    }
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-      padding-bottom: 8px;
-    }
-    .modal-header h2 { font-size: 16px; color: #facc15; }
-    .close-btn {
-      background: none;
-      border: none;
-      color: #94a3b8;
-      font-size: 24px;
-      cursor: pointer;
-    }
-    .inventory-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 6px;
-      max-height: 230px;
-      overflow-y: auto;
-      padding: 2px;
-    }
-    .inv-slot {
-      aspect-ratio: 1;
-      background: rgba(30, 41, 59, 0.7);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 10px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      font-size: 11px;
-    }
-    .inv-slot.filled { border-color: rgba(250, 204, 21, 0.5); }
-    .inv-slot .count {
-      position: absolute;
-      bottom: 3px;
-      right: 5px;
-      font-weight: bold;
-      color: #facc15;
-      font-size: 10px;
-    }
-    .inv-slot .icon { font-size: 18px; }
-
-    .item-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      max-height: 260px;
-      overflow-y: auto;
-    }
-    .list-card {
-      background: rgba(30, 41, 59, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      padding: 10px 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-    }
-    .card-info {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      flex: 1;
-    }
-    .card-title { font-weight: bold; font-size: 12px; color: #f1f5f9; }
-    .card-desc { font-size: 11px; color: #94a3b8; }
-    .card-badge { font-size: 10px; font-weight: bold; color: #facc15; }
-
-    .action-btn-sm {
-      background: #4ade80;
-      color: #0f172a;
-      border: none;
-      border-radius: 8px;
-      padding: 6px 12px;
-      font-weight: 700;
-      font-size: 11px;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-    .action-btn-sm:disabled {
-      background: #475569;
-      color: #94a3b8;
-      cursor: not-allowed;
-    }
-
-    #toast {
-      position: absolute;
-      top: 65px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(15, 23, 42, 0.95);
-      border: 1px solid #4ade80;
-      color: #fff;
-      padding: 8px 18px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: bold;
-      z-index: 200;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.25s, transform 0.25s;
-      text-align: center;
-    }
-    #toast.show {
-      opacity: 1;
-      transform: translateX(-50%) translateY(10px);
-    }
-  </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+/* ---------- النوافذ ---------- */
+#modal-root{position:absolute;inset:0;z-index:10;display:none}
+#modal-root.on{display:block}
+#backdrop{position:absolute;inset:0;background:#0009}
+.sheet{position:absolute;right:0;left:0;bottom:0;top:auto;max-height:82vh;background:var(--panel2);border-top:2px solid var(--amber);border-radius:22px 22px 0 0;display:flex;flex-direction:column;animation:sheetUp .28s cubic-bezier(.2,1,.3,1);backdrop-filter:blur(12px);padding-bottom:var(--sab)}
+@keyframes sheetUp{from{transform:translateY(100%)}}
+.sheet-h{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--line)}
+.sheet-h h2{font-size:17px;color:var(--amber)}
+.x-btn{width:36px;height:36px;border-radius:12px;background:#ffffff12;font-size:16px}
+.sheet-b{overflow-y:auto;padding:12px 14px;-webkit-overflow-scrolling:touch}
+.tabs{display:flex;gap:8px;padding:10px 14px 0}
+.tab{flex:1;padding:8px;border-radius:12px;background:#ffffff0d;font-weight:700;font-size:13px;border:1px solid transparent}
+.tab.on{background:#ffb52e22;border-color:var(--amber);color:var(--amber)}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.slot{aspect-ratio:1;background:#ffffff0a;border:2px solid #ffffff14;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;font-size:24px}
+.slot .q{position:absolute;bottom:2px;left:5px;font-size:10px;font-weight:900;color:#fff;text-shadow:0 1px 2px #000}
+.slot.empty{opacity:.35;font-size:14px}
+.row{display:flex;align-items:center;gap:10px;background:#ffffff08;border:1px solid #ffffff12;border-radius:14px;padding:9px 12px;margin-bottom:8px}
+.row .ic{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;border:2px solid var(--rc)}
+.row .info{flex:1;min-width:0}
+.row .nm{font-weight:900;font-size:13px}
+.row .ds{font-size:11px;color:var(--dim);line-height:1.35}
+.row .st{font-size:10.5px;color:#8fd0ff;margin-top:2px}
+.btn{border-radius:12px;padding:8px 14px;font-weight:900;font-size:12px;background:linear-gradient(160deg,#ffb52e,#ff8c1a);color:#3a2405;white-space:nowrap}
+.btn:active{transform:scale(.95)}
+.btn.alt{background:#ffffff14;color:var(--txt)}
+.btn.grn{background:linear-gradient(160deg,#8ee06a,#4caf50);color:#0d2a08}
+.btn:disabled{opacity:.4;transform:none}
+.pbar{height:8px;background:#0007;border-radius:5px;overflow:hidden;margin-top:5px}
+.pbar i{display:block;height:100%;background:linear-gradient(90deg,var(--amber),#ffd76a);border-radius:5px}
+#weight-bar{height:9px;background:#0007;border-radius:5px;overflow:hidden;margin:4px 14px 10px}
+#weight-fill{height:100%;background:linear-gradient(90deg,#8ee06a,#ffd76a);width:0%}
+.wlabel{font-size:11px;color:var(--dim);padding:0 16px}
+.set-row{display:flex;align-items:center;justify-content:space-between;padding:10px 4px;border-bottom:1px solid #ffffff0d;font-size:13px;font-weight:700;gap:10px}
+.set-row input[type=range]{flex:1;accent-color:var(--amber)}
+.set-row select{background:#2a1f12;color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-family:inherit}
+.toggle{min-width:74px;padding:7px;border-radius:12px;background:#ffffff12;font-weight:900;font-size:12px;text-align:center}
+.toggle.on{background:#8ee06a33;color:#8ee06a;border:1px solid #8ee06a}
+.detail-pop{position:absolute;inset:0;background:#171009f2;border-radius:22px 22px 0 0;padding:18px;display:flex;flex-direction:column;gap:10px;z-index:2;animation:sheetUp .22s}
+#loading{position:fixed;inset:0;z-index:50;background:radial-gradient(120% 100% at 50% 20%,#3a2a12,#120c06);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+#logo{width:150px;height:150px;border-radius:34px;box-shadow:0 10px 40px #000a,0 0 0 3px #ffb52e55}
+#loading h1{font-size:34px;font-weight:900;letter-spacing:4px;color:var(--amber);text-shadow:0 3px 0 #7a4a00}
+#load-tip{font-size:12px;color:var(--dim);max-width:70vw;text-align:center}
+#load-bar{width:200px;height:7px;background:#ffffff14;border-radius:5px;overflow:hidden}
+#load-fill{height:100%;width:5%;background:linear-gradient(90deg,var(--amber),#ffd76a);transition:width .3s}
+#rotate-hint{display:none;position:fixed;inset:0;z-index:60;background:#120c06f0;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-weight:900;text-align:center;padding:20px}
+#rotate-hint .ph{font-size:52px;animation:rot 1.6s infinite}
+@keyframes rot{0%,20%{transform:rotate(0)}60%,100%{transform:rotate(90deg)}}
+@media (orientation:portrait) and (pointer:coarse){ #rotate-hint{display:flex} }
+#fps-tag{position:absolute;bottom:calc(4px + var(--sab));left:calc(8px + var(--sal));z-index:4;font-size:10px;color:#ffffff55;pointer-events:none}
+</style>
 </head>
 <body>
+<div id="app"></div>
+<div id="touch-layer"></div>
 
-  <!-- WebGL Canvas -->
-  <canvas id="game-canvas"></canvas>
-
+<!-- HUD -->
+<div id="hud">
+  <div id="top-bar">
+    <div id="menu-col">
+      <button class="menu-btn" id="btn-inv" title="الحقيبة">🎒</button>
+      <button class="menu-btn" id="btn-mis" title="المهام">📜<i class="badge" id="mis-badge"></i></button>
+      <button class="menu-btn" id="btn-set" title="الإعدادات">⚙️</button>
+    </div>
+    <div id="stat-group">
+      <div class="chip" id="tool-chip">🛠 <b id="tool-name">اليدان</b></div>
+      <div class="chip" id="stamina-wrap">⚡ الطاقة <div id="sta-bar"><div id="sta-fill"></div></div></div>
+      <div class="chip" id="lvl-chip">المستوى <span id="lvl-val">1</span><div id="xp-bar"><div id="xp-fill"></div></div></div>
+      <div class="chip" id="money-chip">💰 $<span id="money-val">0</span></div>
+    </div>
+  </div>
   <div id="crosshair"></div>
-  <div id="interaction-prompt">
-    <span id="prompt-icon">🌾</span>
-    <span id="prompt-text">إزالة القش</span>
-  </div>
-
-  <!-- Random Event Banner -->
-  <div id="event-banner">
-    <span id="event-banner-icon">⚡</span>
-    <span id="event-banner-text">حدث خاص جارٍ!</span>
-    <span id="event-banner-timer" style="background: rgba(0,0,0,0.25); padding: 2px 6px; border-radius: 8px;">30s</span>
-  </div>
-
-  <!-- HUD Layer -->
-  <div id="hud-layer">
-    <div class="hud-top">
-      <div class="hud-group">
-        <div class="stat-pill level">
-          <div style="display: flex; justify-content: space-between; width: 100%;">
-            <span id="hud-level-txt">المستوى 1</span>
-            <span id="hud-xp-txt" style="color: #cbd5e1; font-size: 10px;">0/100</span>
-          </div>
-          <div class="xp-bar-bg">
-            <div class="xp-bar-fill" id="hud-xp-fill"></div>
-          </div>
-        </div>
-        <div class="stat-pill money">
-          <span>💰</span>
-          <span id="hud-money">$0</span>
-        </div>
-        <div class="stat-pill hay">
-          <span>🌾</span>
-          <span id="hud-hay">قش: 0</span>
-        </div>
-      </div>
-
-      <div class="hud-group">
-        <button class="menu-btn" id="btn-open-skills">
-          <span>🧠 المهارات</span>
-          <span id="sp-indicator" style="color: #c084fc;">(0)</span>
-        </button>
-        <button class="menu-btn" id="btn-open-missions">
-          <span>📋 المهام</span>
-          <div class="badge-dot" id="mission-badge"></div>
-        </button>
-        <button class="menu-btn" id="btn-open-settings">
-          <span>⚙️️ الضبط</span>
-        </button>
-        <button class="menu-btn" id="btn-pwa-install" style="display: none; background: #ca8a04;">
-          <span>📲 تثبيت</span>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Mobile Touch Controls -->
-  <div id="mobile-controls">
-    <div id="touch-look-zone"></div>
-    <div id="joystick-container">
-      <div id="joystick-knob"></div>
-    </div>
-    <div class="action-buttons-group">
-      <div class="hud-btn-row">
-        <button class="hud-btn" id="btn-inventory">🎒<br>الحقيبة</button>
-        <button class="hud-btn" id="btn-interact">🤝<br>تفاعل</button>
-      </div>
-      <div class="hud-btn-row">
-        <button class="hud-btn" id="btn-jump">⬆️<br>قفز</button>
-        <button class="hud-btn primary" id="btn-action">💥<br>عمل</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modals -->
-  <!-- 1. Inventory -->
-  <div class="modal" id="modal-inventory">
-    <div class="modal-header">
-      <h2>حقيبة العناصر</h2>
-      <button class="close-btn" id="btn-close-inv">&times;</button>
-    </div>
-    <div class="inventory-grid" id="inv-slots-container"></div>
-    <div style="font-size: 11px; color: #94a3b8; text-align: center;">انقر على الأداة لتجهيزها في يدك</div>
-  </div>
-
-  <!-- 2. Shop -->
-  <div class="modal" id="modal-shop">
-    <div class="modal-header">
-      <h2>محطة التجارة والترقيات</h2>
-      <button class="close-btn" id="btn-close-shop">&times;</button>
-    </div>
-    <div class="item-list">
-      <div class="list-card">
-        <div class="card-info">
-          <span class="card-title">بيع المحاصيل الزراعية</span>
-          <span class="card-desc">سعر القش العادي: $1 | القش المعالج: $3</span>
-        </div>
-        <button class="action-btn-sm" id="btn-sell-hay">بيع الكل</button>
-      </div>
-      <div class="list-card">
-        <div class="card-info">
-          <span class="card-title">بيع الإبر والكنوز</span>
-          <span class="card-desc">بيع الإبر الحديدية، الفضية، والذهبية</span>
-        </div>
-        <button class="action-btn-sm" id="btn-sell-items">بيع الكنوز</button>
-      </div>
-      <div class="list-card">
-        <div class="card-info">
-          <span class="card-title">مجرفة قش صغيرة (Small Rake)</span>
-          <span class="card-desc">تحصد 3x قش مع تعزيز فرصة الكنوز</span>
-        </div>
-        <button class="action-btn-sm" id="btn-buy-rake">شراء ($25)</button>
-      </div>
-      <div class="list-card">
-        <div class="card-info">
-          <span class="card-title">آلة معالجة القش (Mk-1)</span>
-          <span class="card-desc">تعالج القش وتبحث عن الإبر آلياً</span>
-        </div>
-        <button class="action-btn-sm" id="btn-buy-machine">شراء ($80)</button>
-      </div>
-      <div class="list-card">
-        <div class="card-info">
-          <span class="card-title">نظام سيور النقل والفرز الآلي (Conveyor)</span>
-          <span class="card-desc">ينقل القش ويفرزه تلقائياً نحو حاوية الجمع</span>
-        </div>
-        <button class="action-btn-sm" id="btn-buy-conveyor">شراء ($150)</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 3. Skills -->
-  <div class="modal" id="modal-skills">
-    <div class="modal-header">
-      <h2>شجرة المهارات</h2>
-      <button class="close-btn" id="btn-close-skills">&times;</button>
-    </div>
-    <div style="font-size: 12px; color: #c084fc;">نقاط المهارة المتاحة (Skill Points): <strong id="sp-count-modal">0</strong></div>
-    <div class="item-list" id="skills-list-container"></div>
-  </div>
-
-  <!-- 4. Missions -->
-  <div class="modal" id="modal-missions">
-    <div class="modal-header">
-      <h2>سجل المهام والمكافآت</h2>
-      <button class="close-btn" id="btn-close-missions">&times;</button>
-    </div>
-    <div class="item-list" id="missions-list-container"></div>
-  </div>
-
-  <!-- 5. Settings & Performance -->
-  <div class="modal" id="modal-settings">
-    <div class="modal-header">
-      <h2>إعدادات اللعبة والأداء</h2>
-      <button class="close-btn" id="btn-close-settings">&times;</button>
-    </div>
-    <div class="item-list">
-      <div class="list-card">
-        <div class="card-info">
-          <span class="card-title">مستوى الجودة الرسومية (Graphics)</span>
-          <span class="card-desc">تعديل الدقة والظلال لاستهداف 60 FPS</span>
-        </div>
-        <select id="select-graphics" style="background:#1e293b; color:#fff; border:1px solid #475569; padding:4px 8px; border-radius:6px; font-weight:bold;">
-          <option value="high">مرتفعة (High)</option>
-          <option value="med" selected>متوسطة (Medium)</option>
-          <option value="low">منخفضة (Low 60 FPS)</option>
-        </select>
-      </div>
-      <div class="list-card">
-        <div class="card-info">
-          <span class="card-title">حفظ اللعبة يدوياً</span>
-          <span class="card-desc">حفظ فوري لحالة المزرعة في متصفحك</span>
-        </div>
-        <button class="action-btn-sm" id="btn-manual-save">حفظ الآن</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="toast">تم الحفظ التلقائي!</div>
-
-  <script>
-    /**
-     * =========================================================================
-     * HAYSTACK SIMULATOR - PHASE 3
-     * Complete Engine: Conveyor Line + Random Events + PWA + Performance Tuner
-     * =========================================================================
-     */
-
-    // --- PWA SETUP VIA DATA-URI MANIFEST & INLINE SW ---
-    (function setupPWA() {
-      const manifestJSON = {
-        name: "HAYSTACK 3D Simulator",
-        short_name: "Haystack",
-        start_url: window.location.href,
-        display: "standalone",
-        background_color: "#111827",
-        theme_color: "#facc15",
-        orientation: "landscape"
-      };
-      const blob = new Blob([JSON.stringify(manifestJSON)], { type: 'application/json' });
-      const manifestUrl = URL.createObjectURL(blob);
-      document.getElementById('manifest-placeholder').setAttribute('href', manifestUrl);
-
-      if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
-        const swScript = `
-          const CACHE = 'haystack-v3';
-          self.addEventListener('install', e => { self.skipWaiting(); });
-          self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
-          self.addEventListener('fetch', e => {
-            e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
-          });
-        `;
-        const swBlob = new Blob([swScript], { type: 'application/javascript' });
-        navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(() => {});
-      }
-    })();
-
-    // --- 1. WEB AUDIO SYNTHESIZER ---
-    class SoundSystem {
-      constructor() {
-        this.ctx = null;
-      }
-      init() {
-        if (!this.ctx) {
-          const AudioContext = window.AudioContext || window.webkitAudioContext;
-          this.ctx = new AudioContext();
-        }
-        if (this.ctx && this.ctx.state === 'suspended') {
-          this.ctx.resume();
-        }
-      }
-      playRustle() {
-        if (!this.ctx) return;
-        const bufferSize = this.ctx.sampleRate * 0.12;
-        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.35));
-        }
-        const noise = this.ctx.createBufferSource();
-        noise.buffer = buffer;
-        const filter = this.ctx.createBiquadFilter();
-        filter.type = 'bandpass';
-        filter.frequency.value = 1100;
-        filter.Q.value = 2.0;
-        const gain = this.ctx.createGain();
-        gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
-        noise.connect(filter);
-        filter.connect(gain);
-        gain.connect(this.ctx.destination);
-        noise.start();
-      }
-      playCoin() {
-        if (!this.ctx) return;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(987.77, this.ctx.currentTime);
-        osc.frequency.setValueAtTime(1318.51, this.ctx.currentTime + 0.08);
-        gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.3);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start();
-        osc.stop(this.ctx.currentTime + 0.3);
-      }
-      playNeedleFind() {
-        if (!this.ctx) return;
-        const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
-        notes.forEach((freq, idx) => {
-          const osc = this.ctx.createOscillator();
-          const gain = this.ctx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.18, this.ctx.currentTime + idx * 0.06);
-          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + idx * 0.06 + 0.3);
-          osc.connect(gain);
-          gain.connect(this.ctx.destination);
-          osc.start(this.ctx.currentTime + idx * 0.06);
-          osc.stop(this.ctx.currentTime + idx * 0.06 + 0.3);
-        });
-      }
-      playLevelUp() {
-        if (!this.ctx) return;
-        const notes = [440, 554.37, 659.25, 880];
-        notes.forEach((freq, idx) => {
-          const osc = this.ctx.createOscillator();
-          const gain = this.ctx.createGain();
-          osc.type = 'sawtooth';
-          osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.15, this.ctx.currentTime + idx * 0.1);
-          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + idx * 0.1 + 0.4);
-          osc.connect(gain);
-          gain.connect(this.ctx.destination);
-          osc.start(this.ctx.currentTime + idx * 0.1);
-          osc.stop(this.ctx.currentTime + idx * 0.1 + 0.4);
-        });
-      }
-      playStep() {
-        if (!this.ctx) return;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(110, this.ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.07);
-        gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.07);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start();
-        osc.stop(this.ctx.currentTime + 0.07);
-      }
-      playMachineClank() {
-        if (!this.ctx) return;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(80, this.ctx.currentTime);
-        gain.gain.setValueAtTime(0.09, this.ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start();
-        osc.stop(this.ctx.currentTime + 0.12);
-      }
-      playEventTrigger() {
-        if (!this.ctx) return;
-        const notes = [330, 392, 523, 659];
-        notes.forEach((f, i) => {
-          const osc = this.ctx.createOscillator();
-          const gain = this.ctx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.value = f;
-          gain.gain.setValueAtTime(0.2, this.ctx.currentTime + i * 0.08);
-          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + i * 0.08 + 0.25);
-          osc.connect(gain);
-          gain.connect(this.ctx.destination);
-          osc.start(this.ctx.currentTime + i * 0.08);
-          osc.stop(this.ctx.currentTime + i * 0.08 + 0.25);
-        });
-      }
-    }
-
-    // --- 2. INDEXED-DB PERSISTENCE ---
-    class SaveSystem {
-      constructor() {
-        this.dbName = 'HaystackDB_v3';
-        this.dbVersion = 1;
-        this.db = null;
-      }
-      async init() {
-        return new Promise((resolve) => {
-          if (!window.indexedDB) return resolve(false);
-          const request = indexedDB.open(this.dbName, this.dbVersion);
-          request.onupgradeneeded = (e) => {
-            const db = e.target.result;
-            if (!db.objectStoreNames.contains('gamestate')) {
-              db.createObjectStore('gamestate', { keyPath: 'id' });
-            }
-          };
-          request.onsuccess = (e) => {
-            this.db = e.target.result;
-            resolve(true);
-          };
-          request.onerror = () => resolve(false);
-        });
-      }
-      async save(state) {
-        if (this.db) {
-          try {
-            const tx = this.db.transaction('gamestate', 'readwrite');
-            tx.objectStore('gamestate').put({ id: 'save_slot_main', data: state, timestamp: Date.now() });
-          } catch(e) {
-            localStorage.setItem('haystack_v3_backup', JSON.stringify(state));
-          }
-        } else {
-          localStorage.setItem('haystack_v3_backup', JSON.stringify(state));
-        }
-      }
-      async load() {
-        if (this.db) {
-          return new Promise((resolve) => {
-            try {
-              const tx = this.db.transaction('gamestate', 'readonly');
-              const req = tx.objectStore('gamestate').get('save_slot_main');
-              req.onsuccess = () => {
-                if (req.result && req.result.data) resolve(req.result.data);
-                else resolve(this.loadFallback());
-              };
-              req.onerror = () => resolve(this.loadFallback());
-            } catch(e) {
-              resolve(this.loadFallback());
-            }
-          });
-        }
-        return this.loadFallback();
-      }
-      loadFallback() {
-        const raw = localStorage.getItem('haystack_v3_backup') || localStorage.getItem('haystack_v2_backup') || localStorage.getItem('haystack_backup');
-        return raw ? JSON.parse(raw) : null;
-      }
-    }
-
-    // --- 3. ITEMS & INVENTORY SYSTEM ---
-    const ITEM_DATABASE = {
-      hay: { id: 'hay', name: 'قش عادي', icon: '🌾', value: 1, rarity: 'Common' },
-      processed_hay: { id: 'processed_hay', name: 'قش معالج ومصفى', icon: '📦', value: 3, rarity: 'Uncommon' },
-      needle_iron: { id: 'needle_iron', name: 'إبرة حديدية', icon: '🪡', value: 20, rarity: 'Uncommon' },
-      needle_silver: { id: 'needle_silver', name: 'إبرة فضية لامعة', icon: '✨', value: 65, rarity: 'Rare' },
-      needle_gold: { id: 'needle_gold', name: 'إبرة ذهبية أثرية', icon: '🌟', value: 200, rarity: 'Epic' },
-      rake_small: { id: 'rake_small', name: 'مجرفة قش صغيرة', icon: '🧹', value: 25, rarity: 'Common', isTool: true, toolId: 'small_rake' }
-    };
-
-    class Inventory {
-      constructor(size = 16) {
-        this.size = size;
-        this.slots = new Array(size).fill(null);
-      }
-      addItem(itemId, amount = 1) {
-        const def = ITEM_DATABASE[itemId];
-        if (!def) return 0;
-        if (!def.isTool) {
-          for (let i = 0; i < this.size; i++) {
-            if (this.slots[i] && this.slots[i].id === itemId) {
-              this.slots[i].amount += amount;
-              return amount;
-            }
-          }
-        }
-        for (let i = 0; i < this.size; i++) {
-          if (!this.slots[i]) {
-            this.slots[i] = { id: itemId, amount: amount };
-            return amount;
-          }
-        }
-        return 0;
-      }
-      getItemCount(itemId) {
-        let count = 0;
-        for (const s of this.slots) {
-          if (s && s.id === itemId) count += s.amount;
-        }
-        return count;
-      }
-      removeItem(itemId, amount) {
-        let remaining = amount;
-        for (let i = 0; i < this.size; i++) {
-          const s = this.slots[i];
-          if (s && s.id === itemId) {
-            if (s.amount <= remaining) {
-              remaining -= s.amount;
-              this.slots[i] = null;
-            } else {
-              s.amount -= remaining;
-              remaining = 0;
-            }
-            if (remaining <= 0) break;
-          }
-        }
-      }
-      loadSlots(savedSlots) {
-        if (Array.isArray(savedSlots)) this.slots = savedSlots.slice(0, this.size);
-      }
-    }
-
-    // --- 4. TOOL SYSTEM ---
-    const TOOLS_CONFIG = {
-      hands: { id: 'hands', name: 'يد فارغة', hayPerUse: 1, cooldown: 380, needleChanceBonus: 1.0 },
-      small_rake: { id: 'small_rake', name: 'مجرفة قش صغيرة', hayPerUse: 3, cooldown: 320, needleChanceBonus: 1.8 }
-    };
-
-    // --- 5. PROGRESSION & LEVEL SYSTEM ---
-    class ProgressionSystem {
-      constructor(onLevelUpCallback) {
-        this.level = 1;
-        this.xp = 0;
-        this.skillPoints = 0;
-        this.onLevelUp = onLevelUpCallback;
-      }
-      getXpForNextLevel(lvl = this.level) {
-        return Math.floor(100 * Math.pow(1.35, lvl - 1));
-      }
-      addXP(amount) {
-        this.xp += amount;
-        let needed = this.getXpForNextLevel();
-        while (this.xp >= needed) {
-          this.xp -= needed;
-          this.level++;
-          this.skillPoints++;
-          needed = this.getXpForNextLevel();
-          if (this.onLevelUp) this.onLevelUp(this.level, this.skillPoints);
-        }
-      }
-    }
-
-    // --- 6. SKILL TREE SYSTEM ---
-    class SkillTree {
-      constructor() {
-        this.skills = {
-          hawk_eye: { name: 'عين الصقر', desc: 'تزيد فرصة العثور على الإبر النادرة بنسبة +25%', level: 0, max: 5 },
-          heavy_sweep: { name: 'قوة الحصاد', desc: 'تزيد كمية القش المحصود لكل ضربة بمقدار +1', level: 0, max: 5 },
-          agility: { name: 'خفة الحركة', desc: 'تزيد سرعة ركض وحركة اللاعب بنسبة +15%', level: 0, max: 3 },
-          master_trader: { name: 'التاجر البارع', desc: 'تزيد قيمة بيع جميع المحاصيل بنسبة +20%', level: 0, max: 5 }
-        };
-      }
-      upgradeSkill(skillId, progression) {
-        const skill = this.skills[skillId];
-        if (skill && skill.level < skill.max && progression.skillPoints > 0) {
-          progression.skillPoints--;
-          skill.level++;
-          return true;
-        }
-        return false;
-      }
-    }
-
-    // --- 7. MISSION SYSTEM ---
-    class MissionSystem {
-      constructor(game) {
-        this.game = game;
-        this.missions = [
-          { id: 'm_hay_1', title: 'بداية الحصاد', desc: 'اجمع 25 حزمة قش من الكومة', target: 25, current: 0, rewardXP: 45, rewardMoney: 15, completed: false, claimed: false },
-          { id: 'm_needle_1', title: 'سر الكومة', desc: 'اعثر على أول إبرة أياً كان نوعها', target: 1, current: 0, rewardXP: 80, rewardMoney: 30, completed: false, claimed: false },
-          { id: 'm_earn_1', title: 'رأس مال المزرعة', desc: 'اكسب $50 من التجارة والبيع', target: 50, current: 0, rewardXP: 100, rewardMoney: 25, completed: false, claimed: false },
-          { id: 'm_rake_1', title: 'ترقية العتاد', desc: 'امتلك مجرفة القش الصغيرة', target: 1, current: 0, rewardXP: 120, rewardMoney: 40, completed: false, claimed: false },
-          { id: 'm_machine_1', title: 'عصر الميكنة', desc: 'امتلك آلة معالجة القش التلقائية', target: 1, current: 0, rewardXP: 200, rewardMoney: 80, completed: false, claimed: false },
-          { id: 'm_conveyor_1', title: 'خط الإنتاج المتكامل', desc: 'امتلك وشغّل سير النقل الآلي', target: 1, current: 0, rewardXP: 280, rewardMoney: 120, completed: false, claimed: false }
-        ];
-      }
-      trackProgress(type, amount) {
-        let hasNew = false;
-        this.missions.forEach(m => {
-          if (!m.completed) {
-            if (m.id === 'm_hay_1' && type === 'hay') m.current = Math.min(m.target, m.current + amount);
-            if (m.id === 'm_needle_1' && type === 'needle') m.current = Math.min(m.target, m.current + amount);
-            if (m.id === 'm_earn_1' && type === 'money_earned') m.current = Math.min(m.target, m.current + amount);
-            if (m.id === 'm_rake_1' && type === 'has_rake') m.current = 1;
-            if (m.id === 'm_machine_1' && type === 'has_machine') m.current = 1;
-            if (m.id === 'm_conveyor_1' && type === 'has_conveyor') m.current = 1;
-
-            if (m.current >= m.target) {
-              m.completed = true;
-              hasNew = true;
-            }
-          }
-        });
-        if (hasNew) {
-          this.game.sounds.playCoin();
-          this.game.showToast('📋 أنجزت مهمة جديدة! تفقد سجل المهام');
-          this.updateBadge();
-        }
-      }
-      claimReward(missionId) {
-        const m = this.missions.find(x => x.id === missionId);
-        if (m && m.completed && !m.claimed) {
-          m.claimed = true;
-          this.game.progression.addXP(m.rewardXP);
-          this.game.money += m.rewardMoney;
-          this.game.sounds.playLevelUp();
-          this.game.updateHUD();
-          this.updateBadge();
-          this.game.showToast(`استلمت: $${m.rewardMoney} و +${m.rewardXP} XP!`);
-          return true;
-        }
-        return false;
-      }
-      hasUnclaimed() {
-        return this.missions.some(m => m.completed && !m.claimed);
-      }
-      updateBadge() {
-        const badge = document.getElementById('mission-badge');
-        badge.style.display = this.hasUnclaimed() ? 'block' : 'none';
-      }
-    }
-
-    // --- 8. CONVEYOR BELT & AUTOMATION LINE ---
-    class ConveyorSystem {
-      constructor(scene, sounds) {
-        this.scene = scene;
-        this.sounds = sounds;
-        this.owned = false;
-        this.startPos = new THREE.Vector3(2, 0, -6);
-        this.endPos = new THREE.Vector3(10, 0, 7);
-        this.collectorPos = new THREE.Vector3(10, 0, 8.5);
-        this.storageBuffer = 0;
-        this.timer = 0;
-
-        this.bales = [];
-        this.build3DConveyor();
-      }
-
-      build3DConveyor() {
-        this.group = new THREE.Group();
-
-        // Conveyor Rails & Frame
-        const length = this.startPos.distanceTo(this.endPos);
-        const frameGeo = new THREE.BoxGeometry(0.8, 0.25, length);
-        const frameMat = new THREE.MeshLambertMaterial({ color: 0x334155 });
-        this.frameMesh = new THREE.Mesh(frameGeo, frameMat);
-
-        // Position & Rotate Frame towards EndPos
-        const midPoint = new THREE.Vector3().addVectors(this.startPos, this.endPos).multiplyScalar(0.5);
-        this.frameMesh.position.set(midPoint.x, 0.45, midPoint.z);
-        this.frameMesh.lookAt(this.endPos.x, 0.45, this.endPos.z);
-        this.group.add(this.frameMesh);
-
-        // Legs
-        const legGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.9);
-        const legMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
-        for (let i = 0.2; i <= 0.8; i += 0.3) {
-          const lp = new THREE.Vector3().lerpVectors(this.startPos, this.endPos, i);
-          [-0.35, 0.35].forEach(ox => {
-            const leg = new THREE.Mesh(legGeo, legMat);
-            leg.position.set(lp.x + ox, 0.45, lp.z);
-            this.group.add(leg);
-          });
-        }
-
-        // Output Collector Hopper / Bin at end
-        const binGeo = new THREE.BoxGeometry(1.4, 1.0, 1.4);
-        const binMat = new THREE.MeshLambertMaterial({ color: 0xca8a04 });
-        this.binMesh = new THREE.Mesh(binGeo, binMat);
-        this.binMesh.position.set(this.collectorPos.x, 0.5, this.collectorPos.y + 7);
-        this.group.add(this.binMesh);
-
-        // Physical Moving Bales along conveyor
-        const baleGeo = new THREE.BoxGeometry(0.35, 0.25, 0.35);
-        const baleMat = new THREE.MeshLambertMaterial({ color: 0xeab308 });
-        for (let i = 0; i < 4; i++) {
-          const bale = new THREE.Mesh(baleGeo, baleMat);
-          bale.visible = false;
-          this.group.add(bale);
-          this.bales.push({ mesh: bale, progress: i * 0.25 });
-        }
-
-        this.scene.add(this.group);
-      }
-
-      update(delta, game) {
-        if (!this.owned) {
-          this.bales.forEach(b => b.mesh.visible = false);
-          return;
-        }
-
-        // Animate Bales Travelling along line
-        this.bales.forEach(b => {
-          b.mesh.visible = true;
-          b.progress += delta * 0.25;
-          if (b.progress >= 1.0) {
-            b.progress = 0;
-            this.storageBuffer += 1;
-            this.sounds.playMachineClank();
-            game.vfx.spawnHayBurst(this.collectorPos.x, 0.8, this.collectorPos.z);
-          }
-          const curPos = new THREE.Vector3().lerpVectors(this.startPos, this.endPos, b.progress);
-          b.mesh.position.set(curPos.x, 0.65, curPos.z);
-        });
-      }
-
-      collect(game) {
-        if (!this.owned) return;
-        if (this.storageBuffer === 0) {
-          game.showToast('حاوية سير النقل فارغة حالياً');
-          return;
-        }
-        const collected = this.storageBuffer;
-        this.storageBuffer = 0;
-        game.inventory.addItem('processed_hay', collected);
-        game.sounds.playRustle();
-        game.updateHUD();
-        game.showToast(`تم تفريغ خط النقل: ${collected} قش معالج جاهز!`);
-      }
-    }
-
-    // --- 9. RANDOM EVENTS ENGINE ---
-    class RandomEventManager {
-      constructor(game) {
-        this.game = game;
-        this.activeEvent = null;
-        this.timeRemaining = 0;
-        this.nextEventCheck = 35; // Initial cooldown
-
-        this.banner = document.getElementById('event-banner');
-        this.bannerIcon = document.getElementById('event-banner-icon');
-        this.bannerText = document.getElementById('event-banner-text');
-        this.bannerTimer = document.getElementById('event-banner-timer');
-      }
-
-      update(delta) {
-        if (this.activeEvent) {
-          this.timeRemaining -= delta;
-          this.bannerTimer.textContent = `${Math.ceil(this.timeRemaining)}s`;
-          if (this.timeRemaining <= 0) {
-            this.endEvent();
-          }
-        } else {
-          this.nextEventCheck -= delta;
-          if (this.nextEventCheck <= 0) {
-            this.triggerRandomEvent();
-            this.nextEventCheck = 65 + Math.random() * 40; // Every 65-105s
-          }
-        }
-      }
-
-      triggerRandomEvent() {
-        const pool = ['golden_pile', 'vip_order', 'magnetic_rush'];
-        const chosen = pool[Math.floor(Math.random() * pool.length)];
-
-        this.activeEvent = chosen;
-        this.timeRemaining = 40;
-        this.banner.style.display = 'flex';
-        this.game.sounds.playEventTrigger();
-
-        if (chosen === 'golden_pile') {
-          this.bannerIcon.textContent = '🌟';
-          this.bannerText.textContent = 'شحنة قش ذهبية نادرة ظهرت بالساحة!';
-          this.game.spawnGoldenPile();
-          this.game.showToast('🌟 حدث نادر! ظهرت كومة قش ذهبية في المزرعة!');
-        } else if (chosen === 'vip_order') {
-          this.bannerIcon.textContent = '🎩';
-          this.bannerText.textContent = 'تاجر عاجل: مضاعفة أرباح البيع +150% الآن!';
-          this.game.showToast('🎩 التاجر المميز متواجد في الكشك ويشتري بأسعار مضاعفة!');
-        } else if (chosen === 'magnetic_rush') {
-          this.bannerIcon.textContent = '🧲';
-          this.bannerText.textContent = 'عاصفة ممغنطة: فرصة العثور على الإبر 300%!';
-          this.game.showToast('🧲 عاصفة مغناطيسية ترفع احتمالات الإبر لأقصى حد!');
-        }
-      }
-
-      endEvent() {
-        if (this.activeEvent === 'golden_pile') {
-          this.game.removeGoldenPile();
-        }
-        this.activeEvent = null;
-        this.banner.style.display = 'none';
-        this.game.showToast('انتهى مفعول الحدث الخاص');
-      }
-    }
-
-    // --- 10. VFX PARTICLE ENGINE ---
-    class ParticleEngine {
-      constructor(scene) {
-        this.scene = scene;
-        this.particles = [];
-        this.densityFactor = 1.0;
-      }
-      spawnHayBurst(x, y, z, isGold = false) {
-        const count = Math.round(14 * this.densityFactor);
-        if (count <= 0) return;
-        const pGeo = new THREE.BufferGeometry();
-        const positions = new Float32Array(count * 3);
-        const velocities = [];
-
-        for (let i = 0; i < count; i++) {
-          positions[i * 3] = x + (Math.random() - 0.5) * 0.4;
-          positions[i * 3 + 1] = y + 0.3;
-          positions[i * 3 + 2] = z + (Math.random() - 0.5) * 0.4;
-          velocities.push(new THREE.Vector3(
-            (Math.random() - 0.5) * 2.5,
-            1.8 + Math.random() * 2.0,
-            (Math.random() - 0.5) * 2.5
-          ));
-        }
-        pGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        const pMat = new THREE.PointsMaterial({ color: isGold ? 0xfef08a : 0xfacc15, size: 0.18 });
-        const pMesh = new THREE.Points(pGeo, pMat);
-        this.scene.add(pMesh);
-        this.particles.push({ mesh: pMesh, velocities: velocities, life: 0.65 });
-      }
-
-      spawnSmoke(x, y, z) {
-        if (this.densityFactor < 0.5) return;
-        const pGeo = new THREE.BufferGeometry();
-        pGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([x, y, z]), 3));
-        const pMat = new THREE.PointsMaterial({ color: 0x94a3b8, size: 0.3, transparent: true, opacity: 0.8 });
-        const pMesh = new THREE.Points(pGeo, pMat);
-        this.scene.add(pMesh);
-        this.particles.push({
-          mesh: pMesh,
-          velocities: [new THREE.Vector3((Math.random() - 0.5) * 0.3, 1.2, (Math.random() - 0.5) * 0.3)],
-          life: 0.9
-        });
-      }
-
-      update(delta) {
-        for (let i = this.particles.length - 1; i >= 0; i--) {
-          const p = this.particles[i];
-          p.life -= delta;
-          const pos = p.mesh.geometry.attributes.position;
-          for (let j = 0; j < p.velocities.length; j++) {
-            pos.setXYZ(
-              j,
-              pos.getX(j) + p.velocities[j].x * delta,
-              pos.getY(j) + p.velocities[j].y * delta,
-              pos.getZ(j) + p.velocities[j].z * delta
-            );
-            p.velocities[j].y -= 4.0 * delta;
-          }
-          pos.needsUpdate = true;
-          if (p.life <= 0) {
-            this.scene.remove(p.mesh);
-            p.mesh.geometry.dispose();
-            p.mesh.material.dispose();
-            this.particles.splice(i, 1);
-          }
-        }
-      }
-    }
-
-    // --- 11. WORLD BUILDER ---
-    class WorldBuilder {
-      constructor(scene) {
-        this.scene = scene;
-        this.colliders = [];
-      }
-      build() {
-        const groundGeo = new THREE.PlaneGeometry(120, 120);
-        const groundMat = new THREE.MeshLambertMaterial({ color: 0x3d5c2a });
-        const ground = new THREE.Mesh(groundGeo, groundMat);
-        ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
-        this.scene.add(ground);
-
-        const pathGeo = new THREE.PlaneGeometry(8, 60);
-        const pathMat = new THREE.MeshLambertMaterial({ color: 0x6e5233 });
-        const path = new THREE.Mesh(pathGeo, pathMat);
-        path.rotation.x = -Math.PI / 2;
-        path.position.set(0, 0.02, 0);
-        path.receiveShadow = true;
-        this.scene.add(path);
-
-        this.createBarn(-18, 0, -10);
-        this.createShopStall(12, 0, -4);
-        this.createFences();
-
-        this.scene.background = new THREE.Color(0x87ceeb);
-        this.scene.fog = new THREE.FogExp2(0xcce0ff, 0.015);
-      }
-      createBarn(x, y, z) {
-        const barn = new THREE.Group();
-        barn.position.set(x, y, z);
-        const body = new THREE.Mesh(new THREE.BoxGeometry(14, 8, 18), new THREE.MeshLambertMaterial({ color: 0x992222 }));
-        body.position.y = 4;
-        body.castShadow = true;
-        body.receiveShadow = true;
-        barn.add(body);
-
-        const roof = new THREE.Mesh(new THREE.ConeGeometry(11, 4, 4), new THREE.MeshLambertMaterial({ color: 0x222222 }));
-        roof.position.y = 10;
-        roof.rotation.y = Math.PI / 4;
-        roof.scale.set(1.1, 1, 1.4);
-        barn.add(roof);
-
-        this.scene.add(barn);
-        this.colliders.push(new THREE.Box3().setFromObject(body));
-      }
-      createShopStall(x, y, z) {
-        const stall = new THREE.Group();
-        stall.position.set(x, y, z);
-        const counter = new THREE.Mesh(new THREE.BoxGeometry(4, 1.8, 2.5), new THREE.MeshLambertMaterial({ color: 0x5c4033 }));
-        counter.position.y = 0.9;
-        counter.castShadow = true;
-        stall.add(counter);
-
-        const canopy = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.2, 3), new THREE.MeshLambertMaterial({ color: 0x2563eb }));
-        canopy.position.y = 3.2;
-        stall.add(canopy);
-
-        const sign = new THREE.Mesh(new THREE.BoxGeometry(3, 0.7, 0.2), new THREE.MeshLambertMaterial({ color: 0xfacc15 }));
-        sign.position.set(0, 2.6, 1.25);
-        stall.add(sign);
-
-        this.scene.add(stall);
-        this.colliders.push(new THREE.Box3().setFromObject(counter));
-        this.shopZone = new THREE.Vector3(x, 1, z);
-      }
-      createFences() {
-        const fenceMat = new THREE.MeshLambertMaterial({ color: 0x6e5233 });
-        const postGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.5);
-        const railGeo = new THREE.BoxGeometry(3.8, 0.15, 0.08);
-
-        for (let i = -24; i <= 24; i += 4) {
-          const p1 = new THREE.Mesh(postGeo, fenceMat);
-          p1.position.set(i, 0.75, -28);
-          this.scene.add(p1);
-          const r1 = new THREE.Mesh(railGeo, fenceMat);
-          r1.position.set(i + 2, 0.9, -28);
-          this.scene.add(r1);
-
-          const p2 = new THREE.Mesh(postGeo, fenceMat);
-          p2.position.set(i, 0.75, 28);
-          this.scene.add(p2);
-          const r2 = new THREE.Mesh(railGeo, fenceMat);
-          r2.position.set(i + 2, 0.9, 28);
-          this.scene.add(r2);
-        }
-      }
-    }
-
-    // --- 12. HAY SYSTEM ---
-    class HaySystem {
-      constructor(scene) {
-        this.scene = scene;
-        this.piles = [];
-        this.strawCount = 180;
-        this.initPiles();
-      }
-      initPiles() {
-        const locs = [
-          { x: 0, z: -8, initial: 100 },
-          { x: -5, z: 4, initial: 100 },
-          { x: 5, z: 8, initial: 100 }
-        ];
-        const geo = new THREE.CylinderGeometry(0.04, 0.07, 1.1, 4);
-        const mat = new THREE.MeshLambertMaterial({ color: 0xeab308 });
-
-        locs.forEach((loc, idx) => {
-          const mesh = new THREE.InstancedMesh(geo, mat, this.strawCount);
-          mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-          mesh.castShadow = true;
-          mesh.receiveShadow = true;
-
-          const dummy = new THREE.Object3D();
-          const instData = [];
-
-          for (let i = 0; i < this.strawCount; i++) {
-            const rad = Math.sqrt(Math.random()) * 2.2;
-            const angle = Math.random() * Math.PI * 2;
-            dummy.position.set(loc.x + Math.cos(angle) * rad, Math.max(0.1, (1.8 - rad * 0.7) * Math.random()), loc.z + Math.sin(angle) * rad);
-            dummy.rotation.set((Math.random() - 0.5) * 1.2, Math.random() * Math.PI, (Math.random() - 0.5) * 1.2);
-            dummy.scale.set(1, 0.7 + Math.random() * 0.6, 1);
-            dummy.updateMatrix();
-
-            mesh.setMatrixAt(i, dummy.matrix);
-            instData.push({ basePos: dummy.position.clone() });
-          }
-          mesh.instanceMatrix.needsUpdate = true;
-          this.scene.add(mesh);
-
-          this.piles.push({
-            id: idx,
-            position: new THREE.Vector3(loc.x, 0, loc.z),
-            mesh: mesh,
-            instances: instData,
-            remainingHay: loc.initial,
-            maxHay: loc.initial,
-            boundingSphere: new THREE.Sphere(new THREE.Vector3(loc.x, 1, loc.z), 2.8)
-          });
-        });
-      }
-      removeHay(pile, amount) {
-        if (pile.remainingHay <= 0) return 0;
-        const actual = Math.min(pile.remainingHay, amount);
-        pile.remainingHay -= actual;
-
-        const targetActive = Math.ceil((pile.remainingHay / pile.maxHay) * this.strawCount);
-        const dummy = new THREE.Object3D();
-        dummy.scale.set(0, 0, 0);
-        dummy.updateMatrix();
-
-        for (let i = targetActive; i < this.strawCount; i++) {
-          pile.mesh.setMatrixAt(i, dummy.matrix);
-        }
-        pile.mesh.instanceMatrix.needsUpdate = true;
-
-        if (pile.remainingHay <= 0) setTimeout(() => this.respawn(pile), 6000);
-        return actual;
-      }
-      respawn(pile) {
-        pile.remainingHay = pile.maxHay;
-        const dummy = new THREE.Object3D();
-        for (let i = 0; i < this.strawCount; i++) {
-          dummy.position.copy(pile.instances[i].basePos);
-          dummy.rotation.set((Math.random() - 0.5) * 1.2, Math.random() * Math.PI, (Math.random() - 0.5) * 1.2);
-          dummy.scale.set(1, 0.7 + Math.random() * 0.6, 1);
-          dummy.updateMatrix();
-          pile.mesh.setMatrixAt(i, dummy.matrix);
-        }
-        pile.mesh.instanceMatrix.needsUpdate = true;
-      }
-    }
-
-    // --- 13. MK-1 PROCESSOR MACHINE ---
-    class MachineSystem {
-      constructor(scene, sounds) {
-        this.scene = scene;
-        this.sounds = sounds;
-        this.owned = false;
-        this.position = new THREE.Vector3(12, 0, 10);
-        this.processedBuffer = 0;
-        this.foundNeedlesBuffer = 0;
-        this.timer = 0;
-        this.build3DModel();
-      }
-      build3DModel() {
-        this.group = new THREE.Group();
-        this.group.position.copy(this.position);
-
-        const tank = new THREE.Mesh(new THREE.BoxGeometry(3.2, 2.2, 2.5), new THREE.MeshLambertMaterial({ color: 0x334155 }));
-        tank.position.y = 1.1;
-        tank.castShadow = true;
-        this.group.add(tank);
-
-        const hopper = new THREE.Mesh(new THREE.ConeGeometry(1.6, 1.4, 4), new THREE.MeshLambertMaterial({ color: 0x475569 }));
-        hopper.position.set(0, 2.5, 0);
-        hopper.rotation.y = Math.PI / 4;
-        this.group.add(hopper);
-
-        this.gearMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.2, 8), new THREE.MeshLambertMaterial({ color: 0xfacc15 }));
-        this.gearMesh.position.set(1.62, 1.4, 0);
-        this.gearMesh.rotation.z = Math.PI / 2;
-        this.group.add(this.gearMesh);
-
-        this.scene.add(this.group);
-      }
-      update(delta, game) {
-        if (!this.owned) return;
-        this.gearMesh.rotation.y += delta * 4;
-        this.timer += delta;
-        if (this.timer >= 3.5) {
-          this.timer = 0;
-          this.processedBuffer += 2;
-          this.sounds.playMachineClank();
-          if (Math.random() < 0.05) this.foundNeedlesBuffer += 1;
-          game.vfx.spawnSmoke(this.position.x - 1.1, 2.8, this.position.z - 0.6);
-        }
-      }
-      collectOutput(game) {
-        if (!this.owned) return;
-        if (this.processedBuffer === 0 && this.foundNeedlesBuffer === 0) {
-          game.showToast('خزان الآلة فارغ حالياً');
-          return;
-        }
-        const h = this.processedBuffer;
-        const n = this.foundNeedlesBuffer;
-        if (h > 0) game.inventory.addItem('processed_hay', h);
-        if (n > 0) game.inventory.addItem('needle_iron', n);
-
-        this.processedBuffer = 0;
-        this.foundNeedlesBuffer = 0;
-        game.sounds.playRustle();
-        game.updateHUD();
-        game.showToast(`تم تفريغ الآلة: ${h} قش معالج ${n > 0 ? `و ${n} إبرة!` : ''}`);
-      }
-    }
-
-    // --- 14. PLAYER VIEWMODEL & CONTROLLER ---
-    class PlayerController {
-      constructor(camera, soundSys, skills) {
-        this.camera = camera;
-        this.sounds = soundSys;
-        this.skills = skills;
-        this.position = new THREE.Vector3(0, 1.65, 12);
-        this.velocity = new THREE.Vector3();
-        this.yaw = 0;
-        this.pitch = 0;
-        this.isGrounded = true;
-        this.isSprinting = false;
-        this.baseMoveSpeed = 4.2;
-        this.bobTimer = 0;
-        this.defaultY = 1.65;
-        this.moveInput = { x: 0, z: 0 };
-
-        this.initViewmodel();
-        this.initDesktopDebug();
-      }
-      initViewmodel() {
-        this.toolPivot = new THREE.Group();
-        this.camera.add(this.toolPivot);
-        this.toolPivot.position.set(0.35, -0.32, -0.6);
-
-        this.toolMeshGroup = new THREE.Group();
-        this.toolPivot.add(this.toolMeshGroup);
-        this.buildHandMesh();
-        this.isSwinging = false;
-        this.swingProgress = 0;
-      }
-      buildHandMesh() {
-        while (this.toolMeshGroup.children.length > 0) this.toolMeshGroup.remove(this.toolMeshGroup.children[0]);
-        const hand = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.28), new THREE.MeshLambertMaterial({ color: 0xd29a68 }));
-        this.toolMeshGroup.add(hand);
-      }
-      buildRakeMesh() {
-        while (this.toolMeshGroup.children.length > 0) this.toolMeshGroup.remove(this.toolMeshGroup.children[0]);
-        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.8), new THREE.MeshLambertMaterial({ color: 0x8b5a2b }));
-        handle.rotation.x = Math.PI / 3;
-        this.toolMeshGroup.add(handle);
-        const head = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.04, 0.06), new THREE.MeshLambertMaterial({ color: 0x475569 }));
-        head.position.set(0, 0.35, -0.2);
-        this.toolMeshGroup.add(head);
-      }
-      setToolVisual(toolId) {
-        if (toolId === 'small_rake') this.buildRakeMesh();
-        else this.buildHandMesh();
-      }
-      triggerAction() {
-        if (this.isSwinging) return;
-        this.isSwinging = true;
-        this.swingProgress = 0;
-      }
-      jump() {
-        if (this.isGrounded) {
-          this.velocity.y = 5.2;
-          this.isGrounded = false;
-          this.sounds.playStep();
-        }
-      }
-      initDesktopDebug() {
-        window.addEventListener('keydown', (e) => {
-          if (e.code === 'KeyW') this.moveInput.z = -1;
-          if (e.code === 'KeyS') this.moveInput.z = 1;
-          if (e.code === 'KeyA') this.moveInput.x = -1;
-          if (e.code === 'KeyD') this.moveInput.x = 1;
-          if (e.code === 'Space') this.jump();
-          if (e.shiftKey) this.isSprinting = true;
-        });
-        window.addEventListener('keyup', (e) => {
-          if (['KeyW', 'KeyS'].includes(e.code)) this.moveInput.z = 0;
-          if (['KeyA', 'KeyD'].includes(e.code)) this.moveInput.x = 0;
-          if (!e.shiftKey) this.isSprinting = false;
-        });
-      }
-      update(delta) {
-        this.camera.rotation.order = 'YXZ';
-        this.camera.rotation.y = this.yaw;
-        this.camera.rotation.x = this.pitch;
-
-        const agilityBonus = 1 + (this.skills.skills.agility.level * 0.15);
-        const currentSpeed = (this.isSprinting ? this.baseMoveSpeed * 1.6 : this.baseMoveSpeed) * agilityBonus * delta;
-
-        const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
-        const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
-        const moveDir = new THREE.Vector3().addScaledVector(right, this.moveInput.x).addScaledVector(forward, -this.moveInput.z);
-
-        if (moveDir.lengthSq() > 0.001) {
-          moveDir.normalize();
-          this.position.addScaledVector(moveDir, currentSpeed);
-          this.bobTimer += delta * (this.isSprinting ? 14 : 9);
-          this.camera.position.y = this.defaultY + Math.sin(this.bobTimer) * 0.04;
-          if (Math.sin(this.bobTimer) < -0.95) this.sounds.playStep();
-        } else {
-          this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, this.defaultY, 0.1);
-        }
-
-        this.velocity.y -= 9.8 * 1.5 * delta;
-        this.position.y += this.velocity.y * delta;
-        if (this.position.y <= this.defaultY) {
-          this.position.y = this.defaultY;
-          this.velocity.y = 0;
-          this.isGrounded = true;
-        }
-
-        this.position.x = THREE.MathUtils.clamp(this.position.x, -26, 26);
-        this.position.z = THREE.MathUtils.clamp(this.position.z, -26, 26);
-        this.camera.position.x = this.position.x;
-        this.camera.position.z = this.position.z;
-
-        if (this.isSwinging) {
-          this.swingProgress += delta * 7.5;
-          const arc = Math.sin(this.swingProgress * Math.PI);
-          this.toolPivot.rotation.x = -arc * 0.8;
-          this.toolPivot.rotation.y = arc * 0.4;
-          this.toolPivot.position.z = -0.6 + arc * 0.15;
-          if (this.swingProgress >= 1) {
-            this.isSwinging = false;
-            this.toolPivot.rotation.set(0, 0, 0);
-            this.toolPivot.position.set(0.35, -0.32, -0.6);
-          }
-        }
-      }
-    }
-
-    // --- 15. MAIN GAME ENGINE ---
-    class GameEngine {
-      constructor() {
-        this.canvas = document.getElementById('game-canvas');
-        this.sounds = new SoundSystem();
-        this.storage = new SaveSystem();
-        this.inventory = new Inventory(16);
-
-        this.skills = new SkillTree();
-        this.progression = new ProgressionSystem((lvl) => this.onLevelUp(lvl));
-        this.missions = new MissionSystem(this);
-
-        this.money = 0;
-        this.activeToolId = 'hands';
-        this.unlockedTools = ['hands'];
-
-        this.initThree();
-        this.world = new WorldBuilder(this.scene);
-        this.world.build();
-
-        this.haySystem = new HaySystem(this.scene);
-        this.vfx = new ParticleEngine(this.scene);
-        this.machines = new MachineSystem(this.scene, this.sounds);
-        this.conveyor = new ConveyorSystem(this.scene, this.sounds);
-        this.events = new RandomEventManager(this);
-        this.player = new PlayerController(this.camera, this.sounds, this.skills);
-
-        this.raycaster = new THREE.Raycaster();
-        this.currentTarget = null;
-        this.lastActionTime = 0;
-        this.goldenPileMesh = null;
-
-        this.initTouch();
-        this.initModals();
-        this.bindEvents();
-
-        this.loadGame();
-        this.startAutosave();
-        this.initPWAInstaller();
-      }
-
-      initThree() {
-        this.scene = new THREE.Scene();
-        this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
-
-        this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: 'high-performance' });
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-        this.renderer.shadowMap.enabled = true;
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-        const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.65);
-        hemi.position.set(0, 50, 0);
-        this.scene.add(hemi);
-
-        this.dirLight = new THREE.DirectionalLight(0xfffaed, 0.95);
-        this.dirLight.position.set(20, 40, 20);
-        this.dirLight.castShadow = true;
-        this.dirLight.shadow.mapSize.width = 1024;
-        this.dirLight.shadow.mapSize.height = 1024;
-        const d = 30;
-        this.dirLight.shadow.camera.left = -d;
-        this.dirLight.shadow.camera.right = d;
-        this.dirLight.shadow.camera.top = d;
-        this.dirLight.shadow.camera.bottom = -d;
-        this.scene.add(this.dirLight);
-
-        window.addEventListener('resize', () => {
-          this.camera.aspect = window.innerWidth / window.innerHeight;
-          this.camera.updateProjectionMatrix();
-          this.renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-      }
-
-      setGraphicsQuality(level) {
-        if (level === 'low') {
-          this.renderer.setPixelRatio(1.0);
-          this.renderer.shadowMap.enabled = false;
-          this.vfx.densityFactor = 0.2;
-          this.scene.fog.density = 0.025;
-        } else if (level === 'med') {
-          this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-          this.renderer.shadowMap.enabled = true;
-          this.renderer.shadowMap.type = THREE.BasicShadowMap;
-          this.vfx.densityFactor = 0.7;
-          this.scene.fog.density = 0.015;
-        } else {
-          this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2.0));
-          this.renderer.shadowMap.enabled = true;
-          this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-          this.vfx.densityFactor = 1.0;
-          this.scene.fog.density = 0.012;
-        }
-      }
-
-      onLevelUp(level) {
-        this.sounds.playLevelUp();
-        this.money += 25;
-        this.updateHUD();
-        this.showToast(`🎉 ترقية! وصلت للمستوى ${level} ونلت $25 ونقطة مهارة!`);
-      }
-
-      initTouch() {
-        const joy = document.getElementById('joystick-container');
-        const knob = document.getElementById('joystick-knob');
-        let joyId = null;
-        let joyCenter = { x: 0, y: 0 };
-
-        joy.addEventListener('touchstart', (e) => {
-          this.sounds.init();
-          const t = e.changedTouches[0];
-          joyId = t.identifier;
-          const rect = joy.getBoundingClientRect();
-          joyCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-          this.updateJoy(t.clientX, t.clientY, joyCenter, knob);
-        }, { passive: false });
-
-        window.addEventListener('touchmove', (e) => {
-          for (let i = 0; i < e.changedTouches.length; i++) {
-            const t = e.changedTouches[i];
-            if (t.identifier === joyId) this.updateJoy(t.clientX, t.clientY, joyCenter, knob);
-          }
-        }, { passive: false });
-
-        const reset = () => {
-          joyId = null;
-          knob.style.transform = 'translate(0px, 0px)';
-          this.player.moveInput = { x: 0, z: 0 };
-        };
-        window.addEventListener('touchend', reset);
-        window.addEventListener('touchcancel', reset);
-
-        // Touch Look
-        const look = document.getElementById('touch-look-zone');
-        let lookId = null;
-        let lastLook = { x: 0, y: 0 };
-
-        look.addEventListener('touchstart', (e) => {
-          this.sounds.init();
-          const t = e.changedTouches[0];
-          lookId = t.identifier;
-          lastLook = { x: t.clientX, y: t.clientY };
-        }, { passive: false });
-
-        window.addEventListener('touchmove', (e) => {
-          for (let i = 0; i < e.changedTouches.length; i++) {
-            const t = e.changedTouches[i];
-            if (t.identifier === lookId) {
-              const dx = t.clientX - lastLook.x;
-              const dy = t.clientY - lastLook.y;
-              lastLook = { x: t.clientX, y: t.clientY };
-              this.player.yaw -= dx * 0.004;
-              this.player.pitch -= dy * 0.004;
-              this.player.pitch = Math.max(-Math.PI / 2.3, Math.min(Math.PI / 2.3, this.player.pitch));
-            }
-          }
-        }, { passive: false });
-        window.addEventListener('touchend', () => { lookId = null; });
-      }
-
-      updateJoy(x, y, center, knobEl) {
-        const dx = x - center.x;
-        const dy = y - center.y;
-        const dist = Math.hypot(dx, dy);
-        const maxR = 45;
-        const clamped = Math.min(dist, maxR);
-        const angle = Math.atan2(dy, dx);
-        const nx = Math.cos(angle) * clamped;
-        const ny = Math.sin(angle) * clamped;
-
-        knobEl.style.transform = `translate(${nx}px, ${ny}px)`;
-        this.player.moveInput.x = nx / maxR;
-        this.player.moveInput.z = ny / maxR;
-      }
-
-      bindEvents() {
-        document.getElementById('btn-jump').addEventListener('touchstart', (e) => {
-          e.preventDefault();
-          this.sounds.init();
-          this.player.jump();
-        });
-        document.getElementById('btn-action').addEventListener('touchstart', (e) => {
-          e.preventDefault();
-          this.sounds.init();
-          this.performAction();
-        });
-        document.getElementById('btn-interact').addEventListener('touchstart', (e) => {
-          e.preventDefault();
-          this.sounds.init();
-          this.performInteraction();
-        });
-        window.addEventListener('mousedown', (e) => {
-          if (e.target.tagName !== 'BUTTON' && !e.target.closest('.modal')) {
-            this.sounds.init();
-            this.performAction();
-          }
-        });
-      }
-
-      initModals() {
-        const invModal = document.getElementById('modal-inventory');
-        const shopModal = document.getElementById('modal-shop');
-        const skillsModal = document.getElementById('modal-skills');
-        const missionsModal = document.getElementById('modal-missions');
-        const settingsModal = document.getElementById('modal-settings');
-
-        document.getElementById('btn-inventory').addEventListener('click', () => {
-          this.renderInventory();
-          invModal.classList.add('active');
-        });
-        document.getElementById('btn-close-inv').addEventListener('click', () => invModal.classList.remove('active'));
-
-        document.getElementById('btn-close-shop').addEventListener('click', () => shopModal.classList.remove('active'));
-
-        document.getElementById('btn-open-skills').addEventListener('click', () => {
-          this.renderSkills();
-          skillsModal.classList.add('active');
-        });
-        document.getElementById('btn-close-skills').addEventListener('click', () => skillsModal.classList.remove('active'));
-
-        document.getElementById('btn-open-missions').addEventListener('click', () => {
-          this.renderMissions();
-          missionsModal.classList.add('active');
-        });
-        document.getElementById('btn-close-missions').addEventListener('click', () => missionsModal.classList.remove('active'));
-
-        document.getElementById('btn-open-settings').addEventListener('click', () => settingsModal.classList.add('active'));
-        document.getElementById('btn-close-settings').addEventListener('click', () => settingsModal.classList.remove('active'));
-
-        document.getElementById('select-graphics').addEventListener('change', (e) => {
-          this.setGraphicsQuality(e.target.value);
-          this.showToast(`تم تغيير الجودة إلى ${e.target.value}`);
-        });
-
-        document.getElementById('btn-manual-save').addEventListener('click', () => {
-          this.saveGame();
-          this.showToast('💾 تم حفظ اللعبة بنجاح!');
-        });
-
-        // Shop Operations
-        document.getElementById('btn-sell-hay').addEventListener('click', () => {
-          const rawHay = this.inventory.getItemCount('hay');
-          const procHay = this.inventory.getItemCount('processed_hay');
-          let traderBonus = 1 + (this.skills.skills.master_trader.level * 0.2);
-          if (this.events.activeEvent === 'vip_order') traderBonus *= 2.5;
-
-          if (rawHay > 0 || procHay > 0) {
-            let total = 0;
-            if (rawHay > 0) {
-              total += Math.round(rawHay * 1 * traderBonus);
-              this.inventory.removeItem('hay', rawHay);
-            }
-            if (procHay > 0) {
-              total += Math.round(procHay * 3 * traderBonus);
-              this.inventory.removeItem('processed_hay', procHay);
-            }
-            this.money += total;
-            this.progression.addXP(Math.ceil(total * 0.5));
-            this.missions.trackProgress('money_earned', total);
-            this.sounds.playCoin();
-            this.updateHUD();
-            this.showToast(`تم بيع المحاصيل بمبلغ $${total}!`);
-          } else {
-            this.showToast('لا يوجد قش في الحقيبة للبيع');
-          }
-        });
-
-        document.getElementById('btn-sell-items').addEventListener('click', () => {
-          let total = 0;
-          let traderBonus = 1 + (this.skills.skills.master_trader.level * 0.2);
-          if (this.events.activeEvent === 'vip_order') traderBonus *= 2.5;
-
-          ['needle_iron', 'needle_silver', 'needle_gold'].forEach(id => {
-            const count = this.inventory.getItemCount(id);
-            if (count > 0) {
-              const val = Math.round(ITEM_DATABASE[id].value * traderBonus);
-              this.inventory.removeItem(id, count);
-              total += count * val;
-            }
-          });
-          if (total > 0) {
-            this.money += total;
-            this.progression.addXP(Math.ceil(total * 0.6));
-            this.missions.trackProgress('money_earned', total);
-            this.sounds.playCoin();
-            this.updateHUD();
-            this.showToast(`تم بيع الكنوز بمبلغ $${total}!`);
-          } else {
-            this.showToast('لا توجد إبر لبيعها');
-          }
-        });
-
-        document.getElementById('btn-buy-rake').addEventListener('click', () => {
-          if (this.unlockedTools.includes('small_rake')) {
-            this.showToast('أنت تملك المجرفة بالفعل!');
-            return;
-          }
-          if (this.money >= 25) {
-            this.money -= 25;
-            this.unlockedTools.push('small_rake');
-            this.activeToolId = 'small_rake';
-            this.player.setToolVisual('small_rake');
-            this.inventory.addItem('rake_small', 1);
-            this.missions.trackProgress('has_rake', 1);
-            this.sounds.playCoin();
-            this.updateHUD();
-            this.showToast('مبروك! تم شراء مجرفة القش!');
-          } else {
-            this.showToast('لا تملك $25 كافية');
-          }
-        });
-
-        document.getElementById('btn-buy-machine').addEventListener('click', () => {
-          if (this.machines.owned) {
-            this.showToast('أنت تملك الآلة بالفعل!');
-            return;
-          }
-          if (this.money >= 80) {
-            this.money -= 80;
-            this.machines.owned = true;
-            this.missions.trackProgress('has_machine', 1);
-            this.sounds.playCoin();
-            this.updateHUD();
-            this.showToast('🏭 تم تفعيل آلة المعالجة التلقائية!');
-          } else {
-            this.showToast('تحتاج $80 لشراء الآلة');
-          }
-        });
-
-        document.getElementById('btn-buy-conveyor').addEventListener('click', () => {
-          if (this.conveyor.owned) {
-            this.showToast('أنت تملك خط النقل والفرز بالفعل!');
-            return;
-          }
-          if (this.money >= 150) {
-            this.money -= 150;
-            this.conveyor.owned = true;
-            this.missions.trackProgress('has_conveyor', 1);
-            this.sounds.playCoin();
-            this.updateHUD();
-            this.showToast('🚀 رائع! تم تشغيل خط سيور النقل والفرز الآلي!');
-          } else {
-            this.showToast('تحتاج $150 لتشغيل خط النقل');
-          }
-        });
-      }
-
-      renderInventory() {
-        const c = document.getElementById('inv-slots-container');
-        c.innerHTML = '';
-        this.inventory.slots.forEach(s => {
-          const div = document.createElement('div');
-          div.className = `inv-slot ${s ? 'filled' : ''}`;
-          if (s) {
-            const item = ITEM_DATABASE[s.id];
-            div.innerHTML = `
-              <div class="icon">${item.icon}</div>
-              <div style="font-size: 8px; text-align: center;">${item.name}</div>
-              ${s.amount > 1 ? `<span class="count">${s.amount}</span>` : ''}
-            `;
-            if (item.isTool) {
-              div.style.borderColor = '#60a5fa';
-              div.addEventListener('click', () => {
-                this.activeToolId = item.toolId;
-                this.player.setToolVisual(item.toolId);
-                this.updateHUD();
-                this.showToast(`تم تجهيز: ${item.name}`);
-              });
-            }
-          }
-          c.appendChild(div);
-        });
-      }
-
-      renderSkills() {
-        document.getElementById('sp-count-modal').textContent = this.progression.skillPoints;
-        const c = document.getElementById('skills-list-container');
-        c.innerHTML = '';
-        Object.keys(this.skills.skills).forEach(k => {
-          const sk = this.skills.skills[k];
-          const div = document.createElement('div');
-          div.className = 'list-card';
-          div.innerHTML = `
-            <div class="card-info">
-              <span class="card-title">${sk.name} <span class="card-badge">(المستوى ${sk.level}/${sk.max})</span></span>
-              <span class="card-desc">${sk.desc}</span>
-            </div>
-            <button class="action-btn-sm" ${this.progression.skillPoints > 0 && sk.level < sk.max ? '' : 'disabled'}>
-              ${sk.level >= sk.max ? 'مكتمل' : 'ترقية (1 SP)'}
-            </button>
-          `;
-          div.querySelector('button').addEventListener('click', () => {
-            if (this.skills.upgradeSkill(k, this.progression)) {
-              this.sounds.playCoin();
-              this.renderSkills();
-              this.updateHUD();
-            }
-          });
-          c.appendChild(div);
-        });
-      }
-
-      renderMissions() {
-        const c = document.getElementById('missions-list-container');
-        c.innerHTML = '';
-        this.missions.missions.forEach(m => {
-          const div = document.createElement('div');
-          div.className = 'list-card';
-          div.innerHTML = `
-            <div class="card-info">
-              <span class="card-title">${m.title}</span>
-              <span class="card-desc">${m.desc} (${m.current}/${m.target})</span>
-              <span class="card-badge">المكافأة: $${m.rewardMoney} + ${m.rewardXP} XP</span>
-            </div>
-            <button class="action-btn-sm" ${m.completed && !m.claimed ? '' : 'disabled'}>
-              ${m.claimed ? 'تم الاستلام' : (m.completed ? 'استلام المكافأة' : 'قيد التقدم')}
-            </button>
-          `;
-          if (m.completed && !m.claimed) {
-            div.querySelector('button').addEventListener('click', () => {
-              this.missions.claimReward(m.id);
-              this.renderMissions();
-            });
-          }
-          c.appendChild(div);
-        });
-      }
-
-      updateHUD() {
-        document.getElementById('hud-money').textContent = `$${this.money}`;
-        document.getElementById('hud-hay').textContent = `قش: ${this.inventory.getItemCount('hay')}`;
-        document.getElementById('hud-level-txt').textContent = `المستوى ${this.progression.level}`;
-
-        const curXp = this.progression.xp;
-        const tarXp = this.progression.getXpForNextLevel();
-        document.getElementById('hud-xp-txt').textContent = `${curXp}/${tarXp}`;
-        document.getElementById('hud-xp-fill').style.width = `${Math.min(100, (curXp / tarXp) * 100)}%`;
-
-        document.getElementById('sp-indicator').textContent = `(${this.progression.skillPoints})`;
-        this.missions.updateBadge();
-      }
-
-      showToast(msg) {
-        const toast = document.getElementById('toast');
-        toast.textContent = msg;
-        toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 2300);
-      }
-
-      spawnGoldenPile() {
-        if (this.goldenPileMesh) return;
-        const geo = new THREE.ConeGeometry(2.5, 2.2, 8);
-        const mat = new THREE.MeshLambertMaterial({ color: 0xffd700, emissive: 0x664400 });
-        this.goldenPileMesh = new THREE.Mesh(geo, mat);
-        this.goldenPileMesh.position.set(-6, 1.1, -2);
-        this.goldenPileMesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(-6, 1, -2), 3.0);
-        this.goldenPileRemaining = 50;
-        this.scene.add(this.goldenPileMesh);
-      }
-
-      removeGoldenPile() {
-        if (this.goldenPileMesh) {
-          this.scene.remove(this.goldenPileMesh);
-          this.goldenPileMesh = null;
-        }
-      }
-
-      checkRaycastInteraction() {
-        this.raycaster.setFromCamera({ x: 0, y: 0 }, this.camera);
-        const promptEl = document.getElementById('interaction-prompt');
-        const promptText = document.getElementById('prompt-text');
-        const promptIcon = document.getElementById('prompt-icon');
-
-        // Check Golden Hay Event Pile
-        if (this.goldenPileMesh) {
-          if (this.player.position.distanceTo(this.goldenPileMesh.position) < 4.0) {
-            promptEl.style.display = 'flex';
-            promptIcon.textContent = '🌟';
-            promptText.textContent = `حصاد الكومة الذهبية (${this.goldenPileRemaining}) [عمل]`;
-            this.currentTarget = { type: 'golden_pile' };
-            return;
-          }
-        }
-
-        // Check Hay Piles
-        let foundPile = null;
-        for (const p of this.haySystem.piles) {
-          if (this.player.position.distanceTo(p.position) < 3.8) {
-            if (this.raycaster.ray.intersectsSphere(p.boundingSphere)) {
-              foundPile = p;
-              break;
-            }
-          }
-        }
-
-        // Check Shop
-        if (this.player.position.distanceTo(this.world.shopZone) < 4.0) {
-          promptEl.style.display = 'flex';
-          promptIcon.textContent = '🏪';
-          promptText.textContent = 'فتح محطة التجارة [تفاعل]';
-          this.currentTarget = { type: 'shop' };
-          return;
-        }
-
-        // Check Machine
-        if (this.player.position.distanceTo(this.machines.position) < 4.5) {
-          promptEl.style.display = 'flex';
-          promptIcon.textContent = '🏭';
-          promptText.textContent = this.machines.owned
-            ? `تفريغ خزان الآلة (${this.machines.processedBuffer}) [تفاعل]`
-            : 'شراء الآلة من المتجر [تفاعل]';
-          this.currentTarget = { type: 'machine' };
-          return;
-        }
-
-        // Check Conveyor Output
-        if (this.conveyor.owned && this.player.position.distanceTo(this.conveyor.collectorPos) < 4.0) {
-          promptEl.style.display = 'flex';
-          promptIcon.textContent = '📦';
-          promptText.textContent = `تفريغ سير النقل (${this.conveyor.storageBuffer} قش جاهز) [تفاعل]`;
-          this.currentTarget = { type: 'conveyor' };
-          return;
-        }
-
-        if (foundPile && foundPile.remainingHay > 0) {
-          promptEl.style.display = 'flex';
-          promptIcon.textContent = '🌾';
-          promptText.textContent = `إزالة القش (${foundPile.remainingHay}/${foundPile.maxHay})`;
-          this.currentTarget = { type: 'hay', pile: foundPile };
-        } else {
-          promptEl.style.display = 'none';
-          this.currentTarget = null;
-        }
-      }
-
-      performAction() {
-        const now = performance.now();
-        const tool = TOOLS_CONFIG[this.activeToolId];
-        if (now - this.lastActionTime < tool.cooldown) return;
-        this.lastActionTime = now;
-
-        this.player.triggerAction();
-        this.sounds.playRustle();
-
-        if (this.currentTarget && this.currentTarget.type === 'golden_pile') {
-          this.goldenPileRemaining -= 2;
-          this.inventory.addItem('processed_hay', 2);
-          this.progression.addXP(40);
-          this.vfx.spawnHayBurst(-6, 1.2, -2, true);
-
-          // 5x Needle chance on golden pile
-          if (Math.random() < 0.35) {
-            this.inventory.addItem('needle_gold', 1);
-            this.sounds.playNeedleFind();
-            this.showToast('🌟 عثرت على إبرة ذهبية في الكومة الخاصة!');
-          }
-          if (this.goldenPileRemaining <= 0) this.removeGoldenPile();
-          this.updateHUD();
-          return;
-        }
-
-        if (this.currentTarget && this.currentTarget.type === 'hay') {
-          const extraHay = this.skills.skills.heavy_sweep.level;
-          const removed = this.haySystem.removeHay(this.currentTarget.pile, tool.hayPerUse + extraHay);
-
-          if (removed > 0) {
-            this.inventory.addItem('hay', removed);
-            this.progression.addXP(removed * 2);
-            this.missions.trackProgress('hay', removed);
-            this.vfx.spawnHayBurst(this.currentTarget.pile.position.x, 0.6, this.currentTarget.pile.position.z);
-
-            // Needle Chance with Event Buff
-            let eventMult = 1.0;
-            if (this.events.activeEvent === 'magnetic_rush') eventMult = 3.0;
-
-            const hawkEyeBonus = 1 + (this.skills.skills.hawk_eye.level * 0.25);
-            const roll = Math.random() * 100;
-            const luck = tool.needleChanceBonus * hawkEyeBonus * eventMult;
-
-            if (roll < 0.9 * luck) {
-              this.inventory.addItem('needle_gold', 1);
-              this.progression.addXP(50);
-              this.missions.trackProgress('needle', 1);
-              this.sounds.playNeedleFind();
-              this.showToast('🌟 أسطوري! إبرة ذهبية أثرية!');
-            } else if (roll < 3.2 * luck) {
-              this.inventory.addItem('needle_silver', 1);
-              this.progression.addXP(25);
-              this.missions.trackProgress('needle', 1);
-              this.sounds.playNeedleFind();
-              this.showToast('✨ ممتاز! إبرة فضية لامعة!');
-            } else if (roll < 9.5 * luck) {
-              this.inventory.addItem('needle_iron', 1);
-              this.progression.addXP(10);
-              this.missions.trackProgress('needle', 1);
-              this.sounds.playNeedleFind();
-              this.showToast('🪡 إبرة حديدية في القش!');
-            }
-            this.updateHUD();
-          }
-        }
-      }
-
-      performInteraction() {
-        if (!this.currentTarget) return;
-        if (this.currentTarget.type === 'shop') {
-          document.getElementById('modal-shop').classList.add('active');
-        } else if (this.currentTarget.type === 'machine') {
-          if (this.machines.owned) this.machines.collectOutput(this);
-          else document.getElementById('modal-shop').classList.add('active');
-        } else if (this.currentTarget.type === 'conveyor') {
-          this.conveyor.collect(this);
-        } else if (['hay', 'golden_pile'].includes(this.currentTarget.type)) {
-          this.performAction();
-        }
-      }
-
-      initPWAInstaller() {
-        const installBtn = document.getElementById('btn-pwa-install');
-        let deferredPrompt = null;
-
-        window.addEventListener('beforeinstallprompt', (e) => {
-          e.preventDefault();
-          deferredPrompt = e;
-          installBtn.style.display = 'flex';
-        });
-
-        installBtn.addEventListener('click', () => {
-          if (deferredPrompt) {
-            deferredPrompt.prompt();
-            deferredPrompt.userChoice.then(() => {
-              deferredPrompt = null;
-              installBtn.style.display = 'none';
-            });
-          } else {
-            this.showToast('لتثبيت اللعبة: اضغط على خيارات المتصفح ثم "إضافة إلى الشاشة الرئيسية"');
-          }
-        });
-      }
-
-      async loadGame() {
-        await this.storage.init();
-        const s = await this.storage.load();
-        if (s) {
-          this.money = s.money || 0;
-          this.activeToolId = s.activeToolId || 'hands';
-          this.unlockedTools = s.unlockedTools || ['hands'];
-          if (s.inventory) this.inventory.loadSlots(s.inventory);
-
-          if (s.progression) {
-            this.progression.level = s.progression.level || 1;
-            this.progression.xp = s.progression.xp || 0;
-            this.progression.skillPoints = s.progression.skillPoints || 0;
-          }
-          if (s.skills) {
-            Object.keys(s.skills).forEach(k => {
-              if (this.skills.skills[k]) this.skills.skills[k].level = s.skills[k].level;
-            });
-          }
-          if (s.missions) {
-            s.missions.forEach(sm => {
-              const lm = this.missions.missions.find(m => m.id === sm.id);
-              if (lm) {
-                lm.current = sm.current;
-                lm.completed = sm.completed;
-                lm.claimed = sm.claimed;
-              }
-            });
-          }
-          if (s.machines) {
-            this.machines.owned = s.machines.owned || false;
-            this.machines.processedBuffer = s.machines.processedBuffer || 0;
-            this.machines.foundNeedlesBuffer = s.machines.foundNeedlesBuffer || 0;
-          }
-          if (s.conveyor) {
-            this.conveyor.owned = s.conveyor.owned || false;
-            this.conveyor.storageBuffer = s.conveyor.storageBuffer || 0;
-          }
-
-          this.player.setToolVisual(this.activeToolId);
-          this.updateHUD();
-          this.showToast('تم استعادة التقدم المحفوظ بنجاح');
-        } else {
-          this.updateHUD();
-        }
-      }
-
-      saveGame() {
-        const state = {
-          money: this.money,
-          activeToolId: this.activeToolId,
-          unlockedTools: this.unlockedTools,
-          inventory: this.inventory.slots,
-          progression: {
-            level: this.progression.level,
-            xp: this.progression.xp,
-            skillPoints: this.progression.skillPoints
-          },
-          skills: this.skills.skills,
-          missions: this.missions.missions.map(m => ({ id: m.id, current: m.current, completed: m.completed, claimed: m.claimed })),
-          machines: {
-            owned: this.machines.owned,
-            processedBuffer: this.machines.processedBuffer,
-            foundNeedlesBuffer: this.machines.foundNeedlesBuffer
-          },
-          conveyor: {
-            owned: this.conveyor.owned,
-            storageBuffer: this.conveyor.storageBuffer
-          }
-        };
-        this.storage.save(state);
-      }
-
-      startAutosave() {
-        setInterval(() => this.saveGame(), 10000);
-      }
-
-      start() {
-        let lastTime = performance.now();
-        const loop = (time) => {
-          requestAnimationFrame(loop);
-          const delta = Math.min((time - lastTime) / 1000, 0.1);
-          lastTime = time;
-
-          this.player.update(delta);
-          this.machines.update(delta, this);
-          this.conveyor.update(delta, this);
-          this.events.update(delta);
-          this.vfx.update(delta);
-          this.checkRaycastInteraction();
-
-          this.renderer.render(this.scene, this.camera);
-        };
-        requestAnimationFrame(loop);
-      }
-    }
-
-    window.addEventListener('DOMContentLoaded', () => {
-      const game = new GameEngine();
-      game.start();
-    });
-  </script>
+  <div id="prompt"><span id="prompt-text"></span></div>
+</div>
+<div id="fps-tag"></div>
+
+<!-- controls -->
+<div id="joy-zone"><div id="joy-base"><div id="joy-knob"></div></div></div>
+<div id="btn-cluster">
+  <button class="cbtn" id="btn-sprint">🏃<small>جري</small></button>
+  <button class="cbtn" id="btn-jump">⤴<small>قفز</small></button>
+  <button class="cbtn" id="btn-crouch">🧎<small>انحناء</small></button>
+  <button class="cbtn" id="btn-punch">👀<small>نظر</small></button>
+</div>
+<button id="btn-action">⛏<small>إزالة</small></button>
+
+<div id="tut-bar" class="hide">
+  <div id="tut-dots"></div>
+  <div id="tut-text"></div>
+  <button id="tut-skip">تخطي</button>
+</div>
+<div id="toasts"></div>
+
+<div id="discovery"><div id="disc-card"><div class="shine"></div><div id="disc-icon">🪡</div><div id="disc-rarity"></div><div id="disc-name"></div><div id="disc-desc"></div></div></div>
+
+<!-- modals -->
+<div id="modal-root"><div id="backdrop"></div>
+  <div class="sheet" id="sheet"><div class="sheet-h"><h2 id="sheet-title"></h2><button class="x-btn" id="sheet-close">✕</button></div><div class="sheet-b" id="sheet-body"></div></div>
+</div>
+
+<div id="rotate-hint"><div class="ph">📱</div><div>يُفضَّل اللعب بالوضع الأفقي (Landscape)<br>أدر هاتفك للعودة</div></div>
+
+<div id="loading">
+  <canvas id="logo" width="300" height="300"></canvas>
+  <h1>HAYSTACK</h1>
+  <div id="load-bar"><div id="load-fill"></div></div>
+  <div id="load-tip">جارٍ تحميل المزرعة…</div>
+</div>
+
+<script async src="https://ga.jspm.io/npm:es-module-shims@1.8.3/dist/es-module-shims.js"></script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+/* ================= [CORE] helpers ================= */
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const rnd=(a=1,b)=>b===undefined?Math.random()*a:a+Math.random()*(b-a);
+function mulberry32(s){return function(){s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const fmt=n=>n>=1000?(n/1000).toFixed(1)+'k':(''+Math.round(n*10)/10);
+const Bus={m:{},on(e,f){(this.m[e]=this.m[e]||[]).push(f)},emit(e,...a){(this.m[e]||[]).forEach(f=>f(...a))}};
+
+/* ================= [ITEMS] DB ================= */
+const RARITY={common:{n:'شائع',c:'#9aa4ad',xp:15},uncommon:{n:'غير شائع',c:'#4caf50',xp:40},rare:{n:'نادر',c:'#2f9bff',xp:120},epic:{n:'ملحمي',c:'#c05cff',xp:320},legendary:{n:'أسطوري',c:'#ff9800',xp:900},mythic:{n:'خرافي',c:'#ff4d5e',xp:2200}};
+const ITEMS={
+ hay:{n:'قش',d:'قش ذهبي جاف. بِعه في منصة البيع.',v:.5,w:.05,r:'common',s:9999,i:'🌾',c:'res'},
+ straw:{n:'تبن ناعم',d:'بقايا خفيفة من القش.',v:.12,w:.02,r:'common',s:9999,i:'🍂',c:'res'},
+ needle:{n:'إبرة',d:'الإبرة المفقودة! وجدتها.',v:40,w:.01,r:'uncommon',s:99,i:'🪡',c:'rare'},
+ needleSilver:{n:'إبرة فضية',d:'إبرة مصنوعة من الفضة الخالصة.',v:260,w:.01,r:'rare',s:99,i:'🪡',c:'rare'},
+ needleGold:{n:'إبرة ذهبية',d:'إبرة من الذهب الخالص. نادرة جدًا.',v:1300,w:.02,r:'epic',s:99,i:'🪡',c:'rare'},
+ needleRare:{n:'إبرة نادرة',d:'إبرة قديمة بنقوش غامضة.',v:5200,w:.02,r:'legendary',s:99,i:'🪡',c:'rare'},
+ needleAncient:{n:'إبرة عتيقة',d:'قطعة أثرية لا تقدّر بثمن.',v:16000,w:.03,r:'mythic',s:99,i:'🪡',c:'rare'},
+ needleMystery:{n:'إبرة غامضة',d:'لا أحد يعرف مصدرها…',v:600,w:.01,r:'rare',s:99,i:'🪡',c:'rare'},
+ coin:{n:'عملة معدنية',d:'عملة لامعة ضائعة.',v:35,w:.01,r:'common',s:250,i:'🪙',c:'rare'},
+ coinOld:{n:'عملة قديمة',d:'عملة أثرية قيمة.',v:180,w:.01,r:'uncommon',s:250,i:'🪙',c:'rare'},
+ jewelry:{n:'جوهرة',d:'حجر كريم مفقود.',v:320,w:.05,r:'rare',s:99,i:'💎',c:'rare'},
+ ring:{n:'خاتم',d:'خاتم ذهبي فاخر.',v:620,w:.03,r:'rare',s:99,i:'💍',c:'rare'},
+ watch:{n:'ساعة قديمة',d:'ساعة جيب عتيقة.',v:480,w:.08,r:'rare',s:99,i:'⌚',c:'rare'},
+ treasure:{n:'كنز صغير',d:'صندوق صغير مليء بالمجوهرات!',v:2600,w:.5,r:'legendary',s:20,i:'🧰',c:'rare'},
+};
+const LOOT_TABLE=[ // لكل قطعة قش واحدة
+ ['needle',.011,'all'],['needleSilver',.0028,'all'],['needleGold',.0007,'all'],['needleRare',.00014,'all'],
+ ['needleAncient',.00003,'all'],['needleMystery',.0001,'all'],['coin',.0035,'metal'],['coinOld',.0012,'metal'],
+ ['jewelry',.0006,'metal'],['watch',.0005,'metal'],['ring',.0004,'metal'],['treasure',.00002,'metal'],
+];
+const NEEDLE_IDS=['needle','needleSilver','needleGold','needleRare','needleAncient','needleMystery'];
+
+/* ================= [TOOLS] DB ================= */
+const TOOLS={
+ hands:{n:'اليدان',d:'يداكَ العاريتان. البداية المتواضعة.',price:0,cap:1,cd:.55,stam:5,rar:0},
+ stick:{n:'عصا خشبية',d:'عصا بسيطة لتحريك القش.',price:25,cap:2,cd:.5,stam:4.5,rar:.08},
+ rakeS:{n:'مدمة صغيرة',d:'أول أداة حقيقية للبحث.',price:120,cap:4,cd:.45,stam:4,rar:.2},
+ fork:{n:'شوكة قش',d:'تغرس في القش وتقتلع كميات أكبر.',price:420,cap:8,cd:.42,stam:3.5,rar:.35},
+ rakeL:{n:'مدمة كبيرة',d:'مدمة عريضة لعمل جاد.',price:1400,cap:15,cd:.4,stam:3,rar:.5},
+ shovel:{n:'مجرفة',d:'تجرف القش مجرفة كاملة.',price:3500,cap:25,cd:.45,stam:3,rar:.6},
+ magnet:{n:'مغناطيس قوي',d:'يسحب المعادن والأشياء الثمينة من القش.',price:8000,cap:10,cd:.3,stam:2,rar:1.2,metal:1.5},
+ vacuum:{n:'مكنسة شفط',d:'تشفط القش بكميات هائلة.',price:18000,cap:60,cd:.35,stam:2.5,rar:.9,metal:1.2},
+};
+
+/* ================= [SAVE] IndexedDB ================= */
+const SaveSys={db:null,ok:false,
+ init(){return new Promise(res=>{try{const r=indexedDB.open('haystack-db',1);
+  r.onupgradeneeded=e=>{try{e.target.result.createObjectStore('kv')}catch(_){}};
+  r.onsuccess=e=>{this.db=e.target.result;this.ok=true;res(true)};
+  r.onerror=()=>{this.ok=false;res(false)};r.onblocked=()=>res(false);}catch(e){res(false)}})},
+ get(k){return new Promise(res=>{if(this.ok&&this.db){try{const t=this.db.transaction('kv').objectStore('kv').get(k);
+  t.onsuccess=()=>res(t.result??null);t.onerror=()=>res(this.lsGet(k));}catch(e){res(this.lsGet(k))}}else res(this.lsGet(k))})},
+ set(k,v){if(this.ok&&this.db){try{const t=this.db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);
+  t.onerror=()=>this.lsSet(k,v);return}catch(e){}}return this.lsSet(k,v)},
+ del(k){try{if(this.ok&&this.db)this.db.transaction('kv','readwrite').objectStore('kv').delete(k);localStorage.removeItem('hs-'+k)}catch(e){}},
+ lsGet(k){try{return JSON.parse(localStorage.getItem('hs-'+k))}catch(e){return null}},
+ lsSet(k,v){try{localStorage.setItem('hs-'+k,JSON.stringify(v));return true}catch(e){return false}}
+};
+
+/* ================= State ================= */
+let S=null; // حالة اللعبة
+function freshState(){return{v:1,money:15,xp:0,inv:{hay:0},tools:{hands:{lvl:0}},equipped:'hands',bagCap:30,bagLvl:0,
+ missions:{},stats:{hayRemoved:0,needles:0,earned:0,soldValue:0,toolsBought:0,upgrades:0,found:{},sold:{}},
+ piles:{},settings:{sens:1.2,fov:75,quality:'med',audio:true,invert:false},tut:0,pity:0,ts:Date.now()}}
+function xpNeed(l){return Math.round(80*Math.pow(l,1.45))}
+function levelOf(xp){let l=1,need=xpNeed(1);while(xp>=need){xp-=need;l++;need=xpNeed(l)}return{l,left:xp,need}}
+function effTool(){const id=S.equipped,t=TOOLS[id],lvl=(S.tools[id]||{}).lvl||0;
+ return{id,lvl,name:t.n,cap:Math.round(t.cap*(1+.3*lvl)),cd:t.cd*Math.pow(.92,lvl),stam:t.stam,rar:t.rar+.15*lvl,metal:t.metal||1}}
+function upCost(id){const t=TOOLS[id],lvl=(S.tools[id]||{}).lvl||0;return Math.round(t.price*.6*(lvl+1))}
+function bagCost(){return Math.round(150*Math.pow(1.8,S.bagLvl))}
+function invWeight(){let w=0;for(const k in S.inv)w+=(ITEMS[k]?.w||0)*S.inv[k];return w}
+function invAdd(id,q){const it=ITEMS[id];if(!it)return 0;const room=Math.floor((S.bagCap-invWeight())/it.w);const add=Math.min(q,Math.max(0,room));
+ if(add>0){S.inv[id]=(S.inv[id]||0)+add;Bus.emit('inv')}return add}
+let saveTimer=null;function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(saveNow,1500)}
+async function saveNow(){if(!S)return;S.ts=Date.now();
+ for(const p of Hay.piles)S.piles[p.def.id]=p.def.n-(p.aliveCount);
+ await SaveSys.set('save',JSON.parse(JSON.stringify(S)));Bus.emit('saved')}
+
+/* ================= [AUDIO] ================= */
+const AudioSys={ctx:null,master:null,on:true,noiseBuf:null,stepT:0,
+ ensure(){if(this.ctx){if(this.ctx.state==='suspended')this.ctx.resume();return}
+  try{this.ctx=new(window.AudioContext||window.webkitAudioContext)();this.master=this.ctx.createGain();
+  this.master.gain.value=.5;this.master.connect(this.ctx.destination);
+  const b=this.ctx.createBuffer(1,this.ctx.sampleRate*1.5,this.ctx.sampleRate),d=b.getChannelData(0);
+  for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;this.noiseBuf=b;this.ambient();}catch(e){}},
+ env(g,t0,a,peak,d){g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(peak,t0+a);g.gain.exponentialRampToValueAtTime(.0001,t0+a+d)},
+ osc(type,f0,f1,t0,dur,vol){if(!this.ctx||!this.on)return;const o=this.ctx.createOscillator(),g=this.ctx.createGain();
+  o.type=type;o.frequency.setValueAtTime(f0,t0);if(f1)o.frequency.exponentialRampToValueAtTime(f1,t0+dur);
+  this.env(g,t0,.008,vol,dur);o.connect(g);g.connect(this.master);o.start(t0);o.stop(t0+dur+.05)},
+ noise(t0,dur,vol,ftype,freq,q=1){if(!this.ctx||!this.on)return;const s=this.ctx.createBufferSource();s.buffer=this.noiseBuf;
+  const f=this.ctx.createBiquadFilter();f.type=ftype;f.frequency.value=freq;f.Q.value=q;const g=this.ctx.createGain();
+  this.env(g,t0,.01,vol,dur);s.connect(f);f.connect(g);g.connect(this.master);s.start(t0);s.stop(t0+dur+.1)},
+ step(run){if(!this.ctx||!this.on)return;const t=this.ctx.currentTime;this.noise(t,.07,run?.09:.055,'lowpass',420+Math.random()*220)},
+ hay(){if(!this.ctx||!this.on)return;const t=this.ctx.currentTime;this.noise(t,.16,.22,'lowpass',750+Math.random()*250,.7);this.noise(t,.09,.1,'highpass',2600)},
+ swing(){if(!this.ctx||!this.on)return;const t=this.ctx.currentTime;this.noise(t,.12,.08,'bandpass',900,2)},
+ pickup(r){if(!this.ctx||!this.on)return;const t=this.ctx.currentTime;this.osc('sine',660,990,t,.09,.12);
+  if(r!=='common'){this.osc('sine',880,1320,t+.08,.12,.12)}},
+ coin(){if(!this.ctx||!this.on)return;const t=this.ctx.currentTime;this.osc('triangle',1200,1150,t,.07,.14);this.osc('triangle',1650,1600,t+.06,.09,.12)},
+ buy(){if(!this.ctx||!this.on)return;const t=this.ctx.currentTime;this.osc('triangle',520,780,t,.1,.15);this.osc('triangle',780,1160,t+.1,.14,.15)},
+ sell(){if(!this.ctx||!this.on)return;const t=this.ctx.currentTime;this.osc('square',880,880,t,.05,.06);this.osc('square',1174,1174,t+.07,.07,.06)},
+ fanfare(){if(!this.ctx||!this.on)return;const t=this.ctx.currentTime;[523,659,784,1046,1318].forEach((f,i)=>this.osc('triangle',f,f,t+i*.09,.22,.14))},
+ levelup(){if(!this.ctx||!this.on)return;const t=this.ctx.currentTime;this.osc('sawtooth',300,900,t,.35,.1);this.osc('triangle',600,1200,t+.15,.3,.1)},
+ deny(){if(!this.ctx||!this.on)return;const t=this.ctx.currentTime;this.osc('square',220,160,t,.15,.08)},
+ ambient(){if(!this.ctx)return;const s=this.ctx.createBufferSource();s.buffer=this.noiseBuf;s.loop=true;
+  const f=this.ctx.createBiquadFilter();f.type='lowpass';f.frequency.value=280;const g=this.ctx.createGain();g.gain.value=.035;
+  const lfo=this.ctx.createOscillator(),lg=this.ctx.createGain();lfo.frequency.value=.13;lg.gain.value=.02;
+  lfo.connect(lg);lg.connect(g.gain);s.connect(f);f.connect(g);g.connect(this.master);s.start();lfo.start();
+  const birds=()=>{if(this.on&&this.ctx&&Math.random()<.6){const t=this.ctx.currentTime,base=2400+Math.random()*1400;
+   for(let i=0;i<2+Math.random()*3;i++)this.osc('sine',base,base*(1.1+Math.random()*.3),t+i*.12,.07,.03)}
+   setTimeout(birds,2500+Math.random()*5000)};setTimeout(birds,3000)}
+};
+
+/* ================= [UI] toasts / HUD ================= */
+const UI={modalOpen:false,
+ toast(msg,cls=''){const t=document.createElement('div');t.className='toast '+cls;t.textContent=msg;$('toasts').appendChild(t);
+  setTimeout(()=>{t.style.opacity=0;t.style.transition='opacity .4s';setTimeout(()=>t.remove(),400)},2400)},
+ hud(){ $('money-val').textContent=fmt(S.money);const L=levelOf(S.xp);$('lvl-val').textContent=L.l;
+  $('xp-fill').style.width=(100*L.left/L.need)+'%';const tt=effTool();$('tool-name').textContent=tt.name+' · سعة '+tt.cap},
+ stamina(){const f=$('sta-fill');f.style.width=Player.stamina+'%';f.classList.toggle('low',Player.stamina<25)},
+ discovery(it){const R=RARITY[it.r];const card=$('disc-card');card.style.borderColor=R.c;card.style.color=R.c;
+  $('disc-icon').textContent=it.i;$('disc-icon').style.color=R.c;$('disc-rarity').textContent=R.n;$('disc-rarity').style.color=R.c;
+  $('disc-name').style.color='#fff';$('disc-name').textContent=it.n;$('disc-desc').textContent=it.d+' — $'+it.v;
+  $('discovery').classList.add('on');setTimeout(()=>$('discovery').classList.remove('on'),2600)},
+ prompt(txt){const p=$('prompt');if(txt){$('prompt-text').textContent=txt;p.style.display='block'}else p.style.display='none'}
+};
+Bus.on('money',()=>UI.hud());Bus.on('xp',()=>UI.hud());Bus.on('inv',()=>{UI.hud();scheduleSave()});
+
+/* ================= Three core ================= */
+const QUALITY={low:{dpr:1,shadow:false,ss:1024,pieces:420,parts:80,grass:500},med:{dpr:1.5,shadow:true,ss:1024,pieces:720,parts:160,grass:1100},high:{dpr:2,shadow:true,ss:2048,pieces:980,parts:240,grass:1900}};
+let renderer,scene,camera,sun,hemi;
+const appEl=$('app');
+function initThree(){
+ renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+ renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;
+ renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.toneMapping=THREE.ACESFilmicToneMapping;
+ appEl.appendChild(renderer.domElement);
+ scene=new THREE.Scene();
+ const sky=document.createElement('canvas');sky.width=2;sky.height=256;const sg=sky.getContext('2d');
+ const gr=sg.createLinearGradient(0,0,0,256);gr.addColorStop(0,'#4a9fe8');gr.addColorStop(.55,'#9ccbee');gr.addColorStop(.8,'#e8f0e2');gr.addColorStop(1,'#f2e9c8');
+ sg.fillStyle=gr;sg.fillRect(0,0,2,256);const st=new THREE.CanvasTexture(sky);st.colorSpace=THREE.SRGBColorSpace;scene.background=st;
+ scene.fog=new THREE.Fog(0xdfe8dc,55,170);
+ camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,400);camera.rotation.order='YXZ';camera.position.set(0,1.62,20);
+ hemi=new THREE.HemisphereLight(0xbdd7f0,0x6b7a4a,.95);scene.add(hemi);
+ sun=new THREE.DirectionalLight(0xfff0d0,1.6);sun.position.set(38,58,18);sun.castShadow=true;
+ sun.shadow.mapSize.set(2048,2048);const sc=sun.shadow.camera;sc.left=-55;sc.right=55;sc.top=55;sc.bottom=-55;sc.near=10;sc.far=160;
+ sun.shadow.bias=-.0004;scene.add(sun);
+ addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+}
+
+/* ================= procedural textures ================= */
+const TX={};
+function canvasTex(size,draw,rep=1){const c=document.createElement('canvas');c.width=c.height=size;draw(c.getContext('2d'),size);
+ const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rep,rep);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return t}
+function makeTextures(){
+ TX.grass=canvasTex(256,(g,s)=>{g.fillStyle='#79a257';g.fillRect(0,0,s,s);
+  for(let i=0;i<2600;i++){const x=Math.random()*s,y=Math.random()*s,h=68+Math.random()*30,l=30+Math.random()*22;
+   g.strokeStyle=`hsl(${h},42%,${l}%)`;g.lineWidth=1;g.beginPath();g.moveTo(x,y);g.lineTo(x+rnd(-2,2),y-rnd(2,5));g.stroke()}
+  for(let i=0;i<40;i++){g.fillStyle=`rgba(120,95,60,${.05+Math.random()*.08})`;g.beginPath();
+   g.arc(Math.random()*s,Math.random()*s,rnd(6,26),0,7);g.fill()}},26);
+ TX.hay=canvasTex(128,(g,s)=>{g.fillStyle='#d3a94e';g.fillRect(0,0,s,s);
+  for(let i=0;i<600;i++){const x=Math.random()*s,y=Math.random()*s,a=Math.random()*Math.PI;
+   g.strokeStyle=`hsl(${38+Math.random()*14},${55+Math.random()*25}%,${42+Math.random()*30}%)`;g.lineWidth=1.4;
+   g.beginPath();g.moveTo(x,y);g.lineTo(x+Math.cos(a)*rnd(6,18),y+Math.sin(a)*rnd(6,18));g.stroke()}});
+ TX.wood=canvasTex(128,(g,s)=>{g.fillStyle='#8a5a33';g.fillRect(0,0,s,s);
+  for(let i=0;i<s;i+=7){g.fillStyle=`rgba(${60+Math.random()*50},${35+Math.random()*25},15,${.25+Math.random()*.3})`;g.fillRect(0,i,s,4)}
+  for(let i=0;i<20;i++){g.strokeStyle='rgba(40,20,8,.5)';g.beginPath();const y=Math.random()*s;g.moveTo(0,y);g.lineTo(s,y+rnd(-6,6));g.stroke()}},2);
+ TX.roof=canvasTex(128,(g,s)=>{g.fillStyle='#6e3b2a';g.fillRect(0,0,s,s);
+  for(let y=0;y<s;y+=16){g.fillStyle='rgba(0,0,0,.22)';g.fillRect(0,y,s,3);
+   for(let x=(y/16%2)*16;x<s;x+=32){g.fillStyle='rgba(255,255,255,.06)';g.fillRect(x,y,16,16)}}},3);
+ TX.cloud=canvasTex(128,(g,s)=>{const r=g.createRadialGradient(s/2,s/2,8,s/2,s/2,s/2);
+  r.addColorStop(0,'rgba(255,255,255,.95)');r.addColorStop(.7,'rgba(255,255,255,.5)');r.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle=r;g.fillRect(0,0,s,s)});
+ TX.flare=canvasTex(32,(g,s)=>{const r=g.createRadialGradient(s/2,s/2,1,s/2,s/2,s/2);
+  r.addColorStop(0,'rgba(255,255,255,1)');r.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=r;g.fillRect(0,0,s,s)});
+ TX.grassBlade=canvasTex(64,(g,s)=>{g.clearRect(0,0,s,s);for(let i=0;i<9;i++){const x=6+i*6+rnd(-2,2);
+  g.strokeStyle=`hsl(${80+Math.random()*30},48%,${34+Math.random()*22}%)`;g.lineWidth=3;g.beginPath();
+  g.moveTo(x,s);g.quadraticCurveTo(x+rnd(-8,8),s*.5,x+rnd(-10,10),rnd(4,16));g.stroke()}});
+}
+function signTex(text,bg='#7a4a22',fg='#ffe9bd'){const c=document.createElement('canvas');c.width=512;c.height=180;const g=c.getContext('2d');
+ g.fillStyle=bg;g.fillRect(0,0,512,180);g.strokeStyle='#3a2410';g.lineWidth=14;g.strokeRect(7,7,498,166);
+ g.fillStyle=fg;g.font='900 84px Cairo, sans-serif';g.textAlign='center';g.textBaseline='middle';g.direction='rtl';
+ g.fillText(text,256,96);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return t}
+function drawLogo(){const c=$('logo'),g=c.getContext('2d');
+ g.fillStyle='#2a1c0c';g.fillRect(0,0,300,300);
+ const grd=g.createRadialGradient(150,120,10,150,150,190);grd.addColorStop(0,'#5a4018');grd.addColorStop(1,'#1c1208');
+ g.fillStyle=grd;g.fillRect(0,0,300,300);
+ g.fillStyle='#e8b93f';g.beginPath();g.moveTo(150,52);g.bezierCurveTo(70,110,60,200,60,225);g.lineTo(240,225);
+ g.bezierCurveTo(240,200,230,110,150,52);g.fill();
+ g.strokeStyle='#a87f22';g.lineWidth=3;for(let i=0;i<10;i++){g.beginPath();g.moveTo(70+i*17,225);g.quadraticCurveTo(90+i*14,140,150,58);g.stroke()}
+ g.save();g.translate(196,96);g.rotate(.7);g.fillStyle='#f4f6f8';g.fillRect(-3,-34,6,68);
+ g.beginPath();g.arc(0,-34,7,0,Math.PI,true);g.fill();g.restore();
+ g.strokeStyle='#fff2';g.lineWidth=2;g.beginPath();g.arc(196,96,26,0,7);g.stroke();}
+
+/* ================= [WORLD] ================= */
+const Colliders=[]; // {x,z,r}
+function addCol(x,z,r){Colliders.push({x,z,r})}
+const PILE_DEFS=[
+ {id:'p0',x:0,z:6,R:4.2,H:3.2,seed:11},
+ {id:'p1',x:-7,z:-4,R:4.6,H:3.4,seed:22},
+ {id:'p2',x:7,z:-9,R:5.2,H:3.8,seed:33},
+ {id:'p3',x:-14,z:5,R:4,H:3,seed:44},
+ {id:'p4',x:13,z:3,R:4.4,H:3.2,seed:55},
+ {id:'p5',x:2,z:-17,R:5,H:3.6,seed:66},
+];
+const ZONES=[
+ {id:'sell',x:8,z:14,r:2.7,label:'منصة البيع — بِع ما وجدت',icon:'💰'},
+ {id:'shop',x:17,z:-2,r:2.7,label:'المتجر — اشترِ الأدوات',icon:'🛒'},
+];
+function makeMesh(geo,mat,x,y,z,ry=0,shadow=true){const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);m.rotation.y=ry;m.castShadow=shadow;m.receiveShadow=true;scene.add(m);return m}
+function buildWorld(){
+ // ground
+ const ground=new THREE.Mesh(new THREE.PlaneGeometry(320,320),new THREE.MeshStandardMaterial({map:TX.grass,roughness:1}));
+ ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+ const dirtMat=new THREE.MeshStandardMaterial({color:0x8f7350,roughness:1});
+ [[0,0,21],[15,-20,9]].forEach(([x,z,r])=>{const d=new THREE.Mesh(new THREE.CircleGeometry(r,26),dirtMat);
+  d.rotation.x=-Math.PI/2;d.position.set(x,.012,z);d.receiveShadow=true;scene.add(d)});
+ const road=new THREE.Mesh(new THREE.PlaneGeometry(6,26),new THREE.MeshStandardMaterial({color:0x97795a,roughness:1}));
+ road.rotation.x=-Math.PI/2;road.position.set(0,.02,20);road.receiveShadow=true;scene.add(road);
+ // fence
+ const postGeo=new THREE.BoxGeometry(.22,1.5,.22),railGeo=new THREE.BoxGeometry(3.05,.12,.08);
+ const woodMat=new THREE.MeshStandardMaterial({map:TX.wood,roughness:.9});
+ const posts=[],rails=[];const rect={x0:-34,x1:34,z0:-29,z1:29};const step=3;
+ for(let x=rect.x0;x<=rect.x1;x+=step){posts.push([x,rect.z0,0]);posts.push([x,rect.z1,0])}
+ for(let z=rect.z0;z<=rect.z1;z+=step){posts.push([rect.x0,z,0]);posts.push([rect.x1,z,0])}
+ const pm=new THREE.InstancedMesh(postGeo,woodMat,posts.length);const M=new THREE.Matrix4();
+ posts.forEach((p,i)=>{M.makeTranslation(p[0],.75,p[1]);pm.setMatrixAt(i,M)});pm.castShadow=true;scene.add(pm);
+ const railsList=[];
+ for(let x=rect.x0;x<rect.x1;x+=step){railsList.push([x+step/2,rect.z0,0]);railsList.push([x+step/2,rect.z1,0])}
+ for(let z=rect.z0;z<rect.z1;z+=step){railsList.push([rect.x0,z+step/2,1]);railsList.push([rect.x1,z+step/2,1])}
+ const rm=new THREE.InstancedMesh(railGeo,woodMat,railsList.length*2);const Q=new THREE.Quaternion(),E=new THREE.Euler(),SC=new THREE.Vector3(1,1,1),P=new THREE.Vector3();
+ let ri=0;[.5,1.05].forEach(h=>{railsList.forEach(r=>{E.set(0,r[2]?Math.PI/2:0,0);Q.setFromEuler(E);P.set(r[0],h,r[1]);M.compose(P,Q,SC);rm.setMatrixAt(ri++,M)})});
+ rm.castShadow=true;scene.add(rm);
+ // trees
+ const trunkGeo=new THREE.CylinderGeometry(.22,.32,2.4,6),leafGeo=new THREE.ConeGeometry(2,4.2,7);
+ const trunkMat=new THREE.MeshStandardMaterial({color:0x6e4a2a,roughness:1}),leafMat=new THREE.MeshStandardMaterial({color:0x4a7c38,roughness:1});
+ const treePos=[];const rngT=mulberry32(99);
+ while(treePos.length<26){const x=rnd(-52,52),z=rnd(-46,46);
+  if(Math.abs(x)<38&&Math.abs(z)<33)continue;if(Math.hypot(x,z)<40&&Math.abs(z-29)<14)continue;treePos.push([x,z])}
+ const tm=new THREE.InstancedMesh(trunkGeo,trunkMat,treePos.length),lm=new THREE.InstancedMesh(leafGeo,leafMat,treePos.length);
+ treePos.forEach((t,i)=>{const s=.8+rngT()*.9;M.makeScale(s,s,s);M.setPosition(t[0],1.2*s,t[1]);tm.setMatrixAt(i,M);
+  M.makeScale(s,s,s);M.setPosition(t[0],(2.2+2.1)*s*.86,t[1]);lm.setMatrixAt(i,M);addCol(t[0],t[1],.5*s)});
+ tm.castShadow=lm.castShadow=true;scene.add(tm,lm);
+ // barn
+ const barnMat=new THREE.MeshStandardMaterial({map:TX.wood,color:0xc0563d,roughness:.9});
+ makeMesh(new THREE.BoxGeometry(11,6,8),barnMat,-22,3,-10,.35);
+ const roofMat=new THREE.MeshStandardMaterial({map:TX.roof,roughness:1});
+ [[-1,1],[1,-1]].forEach(()=>{});
+ const r1=makeMesh(new THREE.BoxGeometry(11.8,.3,5.2),roofMat,-22,7.1,-10,.35);r1.rotation.z=.62;
+ const r2=makeMesh(new THREE.BoxGeometry(11.8,.3,5.2),roofMat,-22,7.1,-10,.35);r2.rotation.z=-.62;r2.position.y=7.9;
+ r1.position.y=6.9;addCol(-22,-10,7.5);
+ // workshop
+ const wsMat=new THREE.MeshStandardMaterial({map:TX.wood,color:0x8a8a92,roughness:.95});
+ makeMesh(new THREE.BoxGeometry(6,4,5),wsMat,-18,2,15,-.3);
+ const wr=makeMesh(new THREE.BoxGeometry(6.8,.25,5.8),roofMat,-18,4.2,15,-.3);wr.rotation.z=.18;addCol(-18,15,4.4);
+ // shop stand
+ const shopMat=new THREE.MeshStandardMaterial({map:TX.wood,color:0xd8a860,roughness:.85});
+ makeMesh(new THREE.BoxGeometry(3.4,1.1,1.3),shopMat,18,.55,-6.5);
+ [[-1.5,-.5],[1.5,-.5],[-1.5,.5],[1.5,.5]].forEach(p=>makeMesh(new THREE.BoxGeometry(.14,2.6,.14),shopMat,18+p[0],1.3,-6.5+p[1]));
+ const awn=makeMesh(new THREE.BoxGeometry(4,.08,2.4),new THREE.MeshStandardMaterial({color:0xc94f3d,roughness:.9}),18,2.62,-6,.12);awn.rotation.x=.16;
+ addCol(18,-6.5,2.6);
+ // sell platform
+ makeMesh(new THREE.BoxGeometry(4.4,.35,4.4),new THREE.MeshStandardMaterial({map:TX.wood,color:0xc9a05e}),8,.175,14);
+ const scale=makeMesh(new THREE.BoxGeometry(.9,.5,.9),new THREE.MeshStandardMaterial({color:0x555c66,metalness:.5,roughness:.5}),8,.6,14);
+ // storage crates + barrels near barn
+ const crateMat=new THREE.MeshStandardMaterial({map:TX.wood,color:0xb08850});
+ [[-16,-3,.5],[-15.2,-3.8,.42],[-16.4,-4.2,.36],[12,18,.4],[13,17.4,.5]].forEach(c=>{makeMesh(new THREE.BoxGeometry(c[2]*2,c[2]*2,c[2]*2),crateMat,c[0],c[2],c[1],rnd(0,1));addCol(c[0],c[1],c[2]+.2)});
+ const barMat=new THREE.MeshStandardMaterial({color:0x7a4a28,roughness:.9});
+ [[-13.5,-6],[11.5,17.8],[-25,3]].forEach(b=>{makeMesh(new THREE.CylinderGeometry(.42,.42,1.1,10),barMat,b[0],.55,b[1]);addCol(b[0],b[1],.6)});
+ // signs + beacons
+ const mkSign=(txt,x,z,ry,bg)=>{const tex=signTex(txt,bg);const m=new THREE.Mesh(new THREE.PlaneGeometry(2.8,.98),new THREE.MeshBasicMaterial({map:tex}));
+  m.position.set(x,2.5,z);m.rotation.y=ry;scene.add(m);makeMesh(new THREE.BoxGeometry(.12,2.5,.12),woodMat,x,1.25,z)};
+ mkSign('المتجر',18,-4.2,0,'#28527a');mkSign('منصة البيع',8,16.4,Math.PI,'#2e6b3a');mkSign('الحظيرة',-22,-5,.35);
+ mkSign('الورشة',-18,12.2,-.3+Math.PI,'#555');mkSign('منطقة الآلات',15,-14,0,'#4a3a5a');
+ ZONES.forEach(z=>{const col=z.id==='sell'?0x37d67a:0x3fa9ff;
+  const ring=new THREE.Mesh(new THREE.RingGeometry(z.r-.25,z.r,40),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.5,side:THREE.DoubleSide}));
+  ring.rotation.x=-Math.PI/2;ring.position.set(z.x,.03,z.z);scene.add(ring);
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(.25,.45,7,12,1,true),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.14,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+  beam.position.set(z.x,3.5,z.z);scene.add(beam);z.beam=beam});
+ // clouds
+ for(let i=0;i<8;i++){const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:TX.cloud,transparent:true,opacity:.85,depthWrite:false}));
+  sp.position.set(rnd(-120,120),rnd(34,50),rnd(-120,120));sp.scale.set(rnd(16,30),rnd(7,12),1);scene.add(sp);Clouds.push(sp)}
+ // grass blades
+ buildGrass();
+}
+const Clouds=[];let grassMesh=null;
+function buildGrass(){if(grassMesh){scene.remove(grassMesh);grassMesh.geometry.dispose();grassMesh.material.dispose()}
+ const q=QUALITY[S.settings.quality];const n=q.grass;
+ const geo=new THREE.PlaneGeometry(.5,.46);geo.translate(0,.23,0);
+ const mat=new THREE.MeshLambertMaterial({map:TX.grassBlade,alphaTest:.35,side:THREE.DoubleSide});
+ grassMesh=new THREE.InstancedMesh(geo,mat,n);const M=new THREE.Matrix4(),Q=new THREE.Quaternion(),E=new THREE.Euler(),P=new THREE.Vector3(),SC=new THREE.Vector3(),C=new THREE.Color();
+ const rng=mulberry32(7);let placed=0,guard=0;
+ while(placed<n&&guard++<n*4){const x=rnd(-40,40),z=rnd(-36,36);
+  if(PILE_DEFS.some(p=>Math.hypot(x-p.x,z-p.z)<p.R+1))continue;if(Math.abs(x)<3&&z>4)continue;
+  E.set(0,rng()*Math.PI,0);Q.setFromEuler(E);const s=.7+rng()*.9;SC.set(s,s,s);P.set(x,0,z);M.compose(P,Q,SC);
+  grassMesh.setMatrixAt(placed,M);C.setHSL(.24+rng()*.06,.5,.3+rng()*.18);grassMesh.setColorAt(placed,C);placed++}
+ grassMesh.count=placed;grassMesh.receiveShadow=true;scene.add(grassMesh)}
+function applyQuality(q){S.settings.quality=q;const p=QUALITY[q];
+ renderer.setPixelRatio(Math.min(devicePixelRatio,p.dpr));renderer.setSize(innerWidth,innerHeight);
+ renderer.shadowMap.enabled=p.shadow;sun.castShadow=p.shadow;
+ Hay.build(p.pieces);buildGrass();Particles.resize(p.parts);scheduleSave()}
+
+/* ================= [HAY] system ================= */
+const Hay={piles:[],mat:null,geo:null,
+ build(piecesOverride){this.clear();this.geo=new THREE.BoxGeometry(.07,.55,.07);
+  this.mat=new THREE.MeshLambertMaterial({map:TX.hay});
+  for(const def of PILE_DEFS){const q=QUALITY[S.settings.quality];const n=piecesOverride||q.pieces;
+   const rng=mulberry32(def.seed);const mesh=new THREE.InstancedMesh(this.geo,this.mat,n);
+   const pos=new Float32Array(n*3),alive=new Uint8Array(n).fill(1),M=new THREE.Matrix4(),Q=new THREE.Quaternion(),E=new THREE.Euler(),P=new THREE.Vector3(),SC=new THREE.Vector3(),C=new THREE.Color();
+   for(let i=0;i<n;i++){const rad=def.R*Math.pow(rng(),.6),a=rng()*Math.PI*2;
+    const x=def.x+Math.cos(a)*rad,z=def.z+Math.sin(a)*rad;
+    const hMax=def.H*(1-Math.pow(rad/def.R,2));const y=.06+hMax*Math.pow(rng(),.8);
+    E.set((rng()-.5)*1.3,rng()*Math.PI,(rng()-.5)*1.3);Q.setFromEuler(E);
+    const s=.7+rng()*.75;SC.set(s,s,s);P.set(x,y,z);M.compose(P,Q,SC);mesh.setMatrixAt(i,M);
+    pos[i*3]=x;pos[i*3+1]=y;pos[i*3+2]=z;
+    C.setHSL(.115+rng()*.03,.62,.42+rng()*.2);mesh.setColorAt(i,C)}
+   mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;
+   mesh.castShadow=true;mesh.receiveShadow=true;try{mesh.computeBoundingSphere()}catch(e){mesh.frustumCulled=false}
+   scene.add(mesh);
+   const pile={def,mesh,pos,alive,n,aliveCount:n,order:null};
+   // ترتيب حتمي للإزالة المحفوظة
+   const orng=mulberry32(def.seed*31+7);const ord=[...Array(n).keys()];
+   for(let i=n-1;i>0;i--){const j=Math.floor(orng()*(i+1));[ord[i],ord[j]]=[ord[j],ord[i]]}pile.order=ord;
+   this.piles.push(pile);addCol(def.x,def.z,def.R*.55);
+   const rem=S.piles[def.id]||0;if(rem>0)this.killCount(pile,Math.min(rem,n))}
+ },
+ killCount(pile,count){const M=new THREE.Matrix4();
+  for(let k=0;k<count&&k<pile.n;k++){const i=pile.order[k];if(!pile.alive[i])continue;pile.alive[i]=0;pile.aliveCount--;
+   M.makeScale(0,0,0);M.setPosition(0,-500,0);pile.mesh.setMatrixAt(i,M)}
+  pile.mesh.instanceMatrix.needsUpdate=true},
+ clear(){for(const p of this.piles){scene.remove(p.mesh);p.mesh.dispose()}this.piles.length=0;
+  for(let i=Colliders.length-1;i>=0;i--)if(Colliders[i].hayCol)Colliders.splice(i,1)},
+ nearest(x,z,maxD){let best=null,bd=maxD;for(const p of this.piles){const d=Math.hypot(x-p.def.x,z-p.def.z)-p.def.R;if(d<bd){bd=d;best=p}}return best},
+ removeAt(pile,point,cap){const r=Math.min(2.3,.55+cap*.06),r2=r*r;const cand=[];
+  for(let i=0;i<pile.n;i++){if(!pile.alive[i])continue;const dx=pile.pos[i*3]-point.x,dy=pile.pos[i*3+1]-point.y,dz=pile.pos[i*3+2]-point.z;
+   const d2=dx*dx+dy*dy+dz*dz;if(d2<r2)cand.push([d2,i])}
+  cand.sort((a,b)=>a[0]-b[0]);const take=cand.slice(0,cap);if(!take.length)return{n:0};
+  const M=new THREE.Matrix4();for(const[,i]of take){pile.alive[i]=0;pile.aliveCount--;
+   M.makeScale(0,0,0);M.setPosition(0,-500,0);pile.mesh.setMatrixAt(i,M)}
+  pile.mesh.instanceMatrix.needsUpdate=true;return{n:take.length}}}
+
+/* ================= [FX] particles / floaters / reticle ================= */
+const Particles={max:160,geo:null,pts:null,pos:null,vel:null,life:null,cols:null,cap:160,
+ init(){this.resize(QUALITY[S.settings.quality].parts)},
+ resize(cap){this.cap=cap;if(this.pts){scene.remove(this.pts);this.geo.dispose()}
+  this.max=cap;this.pos=new Float32Array(cap*3);this.vel=new Float32Array(cap*3);this.life=new Float32Array(cap);
+  this.cols=new Float32Array(cap*3);this.geo=new THREE.BufferGeometry();
+  this.geo.setAttribute('position',new THREE.BufferAttribute(this.pos,3));
+  this.geo.setAttribute('color',new THREE.BufferAttribute(this.cols,3));
+  const mat=new THREE.PointsMaterial({size:.1,map:TX.flare,vertexColors:true,transparent:true,depthWrite:false});
+  this.pts=new THREE.Points(this.geo,mat);this.pts.frustumCulled=false;scene.add(this.pts);
+  for(let i=0;i<cap;i++)this.pos[i*3+1]=-999},
+ burst(p,count,color,spd=2,up=2){const c=new THREE.Color(color);let done=0;
+  for(let i=0;i<this.max&&done<count;i++){if(this.life[i]>0)continue;this.life[i]=rnd(.3,.7);
+   this.pos[i*3]=p.x+rnd(-.15,.15);this.pos[i*3+1]=p.y+rnd(-.1,.15);this.pos[i*3+2]=p.z+rnd(-.15,.15);
+   this.vel[i*3]=rnd(-spd,spd);this.vel[i*3+1]=rnd(.5,up+1.5);this.vel[i*3+2]=rnd(-spd,spd);
+   const v=.75+Math.random()*.25;this.cols[i*3]=c.r*v;this.cols[i*3+1]=c.g*v;this.cols[i*3+2]=c.b*v;done++}},
+ update(dt){let any=false;for(let i=0;i<this.max;i++){if(this.life[i]<=0)continue;any=true;this.life[i]-=dt;
+   if(this.life[i]<=0){this.pos[i*3+1]=-999;continue}
+   this.vel[i*3+1]-=7*dt;this.pos[i*3]+=this.vel[i*3]*dt;this.pos[i*3+1]+=this.vel[i*3+1]*dt;this.pos[i*3+2]+=this.vel[i*3+2]*dt;
+   if(this.pos[i*3+1]<0){this.pos[i*3+1]=0;this.vel[i*3+1]*=-.3}}
+  if(any){this.geo.attributes.position.needsUpdate=true;this.geo.attributes.color.needsUpdate=true}}};
+const Floaters={pool:[],idx:0,
+ init(){for(let i=0;i<6;i++){const sp=new THREE.Sprite(new THREE.SpriteMaterial({transparent:true,depthTest:false}));
+  sp.visible=false;sp.renderOrder=99;scene.add(sp);this.pool.push({sp,t:1})}},
+ show(text,color,p){const f=this.pool[this.idx++%this.pool.length];const c=document.createElement('canvas');c.width=512;c.height=110;
+  const g=c.getContext('2d');g.font='900 58px Cairo, sans-serif';g.textAlign='center';g.direction='rtl';
+  g.lineWidth=10;g.strokeStyle='#00000cc';g.strokeText(text,256,72);g.fillStyle=color;g.fillText(text,256,72);
+  if(f.sp.material.map)f.sp.material.map.dispose();f.sp.material.map=new THREE.CanvasTexture(c);f.sp.material.needsUpdate=true;
+  f.sp.position.copy(p);f.sp.position.y+=.5;f.sp.scale.set(2.4,.52,1);f.t=0;f.sp.visible=true},
+ update(dt){for(const f of this.pool){if(f.t>=1)continue;f.t+=dt/.9;f.sp.position.y+=dt*.9;
+  f.sp.material.opacity=1-f.t;if(f.t>=1)f.sp.visible=false}}};
+let reticle=null;
+function initReticle(){reticle=new THREE.Mesh(new THREE.RingGeometry(.14,.22,24),new THREE.MeshBasicMaterial({color:0xffb52e,transparent:true,opacity:.9,side:THREE.DoubleSide,depthTest:false}));
+ reticle.renderOrder=98;reticle.visible=false;scene.add(reticle)}
+
+/* ================= [ITEMS] pickups ================= */
+const Pickups={list:[],
+ spawn(itemId,p){const it=ITEMS[itemId];const g=new THREE.Group();const R=RARITY[it.r];
+  const col=new THREE.Color(R.c);let mesh;
+  if(itemId.startsWith('needle')){mesh=new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,.36,6),
+   new THREE.MeshStandardMaterial({color:itemId==='needleGold'?0xffce4d:itemId==='needleSilver'?0xd8dde2:0xb8bcc2,metalness:.9,roughness:.25,emissive:col,emissiveIntensity:.35}));
+   mesh.rotation.z=Math.PI/2.3}
+  else if(itemId==='coin'||itemId==='coinOld'){mesh=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,.035,16),
+   new THREE.MeshStandardMaterial({color:itemId==='coinOld'?0xb08d57:0xffce4d,metalness:.85,roughness:.3,emissive:col,emissiveIntensity:.25}));mesh.rotation.x=Math.PI/2}
+  else if(itemId==='jewelry'){mesh=new THREE.Mesh(new THREE.IcosahedronGeometry(.11),
+   new THREE.MeshStandardMaterial({color:0x66ccff,metalness:.4,roughness:.1,emissive:col,emissiveIntensity:.5}))}
+  else if(itemId==='ring'){mesh=new THREE.Mesh(new THREE.TorusGeometry(.1,.035,10,20),
+   new THREE.MeshStandardMaterial({color:0xffce4d,metalness:.9,roughness:.2,emissive:col,emissiveIntensity:.3}))}
+  else if(itemId==='watch'){mesh=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,.05,16),
+   new THREE.MeshStandardMaterial({color:0xc0a060,metalness:.8,roughness:.3,emissive:col,emissiveIntensity:.2}))}
+  else if(itemId==='treasure'){mesh=new THREE.Mesh(new THREE.BoxGeometry(.3,.22,.2),
+   new THREE.MeshStandardMaterial({color:0xa06a2c,roughness:.6,emissive:col,emissiveIntensity:.3}))}
+  else{mesh=new THREE.Mesh(new THREE.SphereGeometry(.09,10,8),new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:.4}))}
+  g.add(mesh);
+  const ri=['epic','legendary','mythic'].indexOf(it.r);
+  if(ri>=0){const l=new THREE.PointLight(col,2.2,4.5);g.add(l)}
+  g.position.set(p.x+rnd(-.3,.3),Math.max(p.y,.3)+.15,p.z+rnd(-.3,.3));scene.add(g);
+  this.list.push({g,it,t:rnd(0,6),base:g.position.y})},
+ update(dt,ppos){for(let i=this.list.length-1;i>=0;i--){const p=this.list[i];p.t+=dt;
+   p.g.rotation.y+=dt*1.6;p.g.position.y=p.base+Math.sin(p.t*2.2)*.08;
+   const d=p.g.position.distanceTo(ppos);
+   if(d<2.6){p.g.position.lerp(ppos.clone().setY(ppos.y-.2),Math.min(1,dt*8))}
+   if(d<1.1){this.collect(i)}}},
+ collect(i){const p=this.list[i];scene.remove(p.g);this.list.splice(i,1);const it=p.it;
+  const added=invAdd(it.id||p.itId||'',1); // placeholder (not used)
+ }};
+// نعيد تعريف الالتقاط بشكل صحيح مع معرف العنصر
+Pickups.spawn=function(itemId,p){const it=ITEMS[itemId];const g=new THREE.Group();const R=RARITY[it.r];const col=new THREE.Color(R.c);let mesh;
+ if(itemId.startsWith('needle')){mesh=new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,.36,6),new THREE.MeshStandardMaterial({color:itemId==='needleGold'?0xffce4d:itemId==='needleSilver'?0xd8dde2:0xb8bcc2,metalness:.9,roughness:.25,emissive:col,emissiveIntensity:.35}));mesh.rotation.z=Math.PI/2.3}
+ else if(itemId==='coin'||itemId==='coinOld'){mesh=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,.035,16),new THREE.MeshStandardMaterial({color:itemId==='coinOld'?0xb08d57:0xffce4d,metalness:.85,roughness:.3,emissive:col,emissiveIntensity:.25}));mesh.rotation.x=Math.PI/2}
+ else if(itemId==='jewelry'){mesh=new THREE.Mesh(new THREE.IcosahedronGeometry(.11),new THREE.MeshStandardMaterial({color:0x66ccff,metalness:.4,roughness:.1,emissive:col,emissiveIntensity:.5}))}
+ else if(itemId==='ring'){mesh=new THREE.Mesh(new THREE.TorusGeometry(.1,.035,10,20),new THREE.MeshStandardMaterial({color:0xffce4d,metalness:.9,roughness:.2,emissive:col,emissiveIntensity:.3}))}
+ else if(itemId==='watch'){mesh=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,.05,16),new THREE.MeshStandardMaterial({color:0xc0a060,metalness:.8,roughness:.3,emissive:col,emissiveIntensity:.2}))}
+ else if(itemId==='treasure'){mesh=new THREE.Mesh(new THREE.BoxGeometry(.3,.22,.2),new THREE.MeshStandardMaterial({color:0xa06a2c,roughness:.6,emissive:col,emissiveIntensity:.3}))}
+ else{mesh=new THREE.Mesh(new THREE.SphereGeometry(.09,10,8),new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:.4}))}
+ g.add(mesh);if(['epic','legendary','mythic'].includes(it.r)){g.add(new THREE.PointLight(col,2.2,4.5))}
+ g.position.set(p.x+rnd(-.3,.3),Math.max(p.y,.3)+.15,p.z+rnd(-.3,.3));scene.add(g);
+ this.list.push({g,it,id:itemId,t:rnd(0,6),base:g.position.y})};
+Pickups.collect=function(i){const p=this.list[i];scene.remove(p.g);this.list.splice(i,1);
+ const it=p.it,id=p.id;const room=S.bagCap-invWeight();
+ if(room<it.w){UI.toast('حقيبتك ممتلئة! بِع بعض العناصر','bad');AudioSys.deny();this.list.push(p);scene.add(p.g);return}
+ S.inv[id]=(S.inv[id]||0)+1;S.stats.found[id]=(S.stats.found[id]||0)+1;
+ if(NEEDLE_IDS.includes(id)){S.stats.needles++;S.pityDone=true}
+ gainXP(RARITY[it.r].xp);AudioSys.pickup(it.r);
+ Floaters.show('+ '+it.n,RARITY[it.r].c,p.g.position);
+ Particles.burst(p.g.position,10,RARITY[it.r].c,1.6,2);
+ if(['rare','epic','legendary','mythic'].includes(it.r)){UI.discovery(it);AudioSys.fanfare();Player.shake(.18);
+  UI.toast('اكتشاف '+RARITY[it.r].n+'! +$'+it.v,'gold')}
+ Bus.emit('inv');Bus.emit('found',id);scheduleSave()};
+
+/* ================= XP / economy ================= */
+function gainXP(n){const before=levelOf(S.xp).l;S.xp+=n;const after=levelOf(S.xp);
+ if(after.l>before.l){const bonus=after.l*15;S.money+=bonus;AudioSys.levelup();Player.shake(.15);
+  UI.toast('🎉 مستوى '+after.l+'! مكافأة $'+bonus,'gold');Bus.emit('money')}
+ Bus.emit('xp');scheduleSave()}
+function addMoney(n,fromSell){S.money+=n;if(fromSell)S.stats.earned+=n;Bus.emit('money');scheduleSave()}
+
+/* ================= [PLAYER] + [INPUT] ================= */
+const Player={pos:new THREE.Vector3(0,0,20),vy:0,yaw:0,pitch:0,grounded:true,crouch:false,sprintHeld:false,
+ stamina:100,bobT:0,stepT:0,shakeAmp:0,pitchKick:0,fov:75,moveDist:0,lookDist:0,
+ eye(){return this.crouch?.95:1.62},shake(a){this.shakeAmp=Math.max(this.shakeAmp,a)}};
+const Input={joy:{x:0,y:0,id:null},keys:{},actionHeld:false,sprint:false,lookId:null,lastX:0,lastY:0};
+function initInput(){
+ const jz=$('joy-zone'),base=$('joy-base'),knob=$('joy-knob');
+ jz.addEventListener('pointerdown',e=>{AudioSys.ensure();if(Input.joy.id!==null)return;Input.joy.id=e.pointerId;
+  jz.setPointerCapture(e.pointerId);base.style.display='block';base.style.left=e.clientX+'px';base.style.top=e.clientY+'px';
+  knob.style.left=e.clientX+'px';knob.style.top=e.clientY+'px';base._ox=e.clientX;base._oy=e.clientY});
+ jz.addEventListener('pointermove',e=>{if(e.pointerId!==Input.joy.id)return;
+  let dx=e.clientX-base._ox,dy=e.clientY-base._oy;const d=Math.hypot(dx,dy),max=52;
+  if(d>max){dx=dx/d*max;dy=dy/d*max}knob.style.left=(base._ox+dx)+'px';knob.style.top=(base._oy+dy)+'px';
+  Input.joy.x=dx/max;Input.joy.y=-dy/max});
+ const joyEnd=e=>{if(e.pointerId!==Input.joy.id)return;Input.joy.id=null;Input.joy.x=Input.joy.y=0;base.style.display='none'};
+ jz.addEventListener('pointerup',joyEnd);jz.addEventListener('pointercancel',joyEnd);
+ // look
+ const layer=$('touch-layer');
+ layer.addEventListener('touchstart',e=>{AudioSys.ensure();for(const t of e.changedTouches){if(Input.lookId===null){Input.lookId=t.identifier;Input.lastX=t.clientX;Input.lastY=t.clientY}}e.preventDefault()},{passive:false});
+ layer.addEventListener('touchmove',e=>{for(const t of e.changedTouches){if(t.identifier!==Input.lookId)continue;
+  const dx=t.clientX-Input.lastX,dy=t.clientY-Input.lastY;Input.lastX=t.clientX;Input.lastY=t.clientY;
+  lookBy(dx,dy);Player.lookDist+=Math.abs(dx)+Math.abs(dy)}e.preventDefault()},{passive:false});
+ const lookEnd=e=>{for(const t of e.changedTouches)if(t.identifier===Input.lookId)Input.lookId=null};
+ layer.addEventListener('touchend',lookEnd);layer.addEventListener('touchcancel',lookEnd);
+ // mouse debug
+ const cv=renderer.domElement;
+ cv.addEventListener('click',()=>{AudioSys.ensure();if(matchMedia('(pointer:fine)').matches&&!document.pointerLockElement)cv.requestPointerLock()});
+ document.addEventListener('mousemove',e=>{if(document.pointerLockElement===cv)lookBy(e.movementX,e.movementY)});
+ addEventListener('keydown',e=>{Input.keys[e.code]=true;AudioSys.ensure();
+  if(e.code==='KeyE')doInteract();if(e.code==='KeyI')Modals.open('inv');if(e.code==='Escape')Modals.close()});
+ addEventListener('keyup',e=>Input.keys[e.code]=false);
+ // buttons
+ const bind=(id,down,up)=>{const b=$(id);const pd=e=>{e.preventDefault();AudioSys.ensure();b.classList.add('active');down&&down()};
+  const pu=e=>{e.preventDefault();b.classList.remove('active');up&&up()};
+  b.addEventListener('pointerdown',pd);b.addEventListener('pointerup',pu);b.addEventListener('pointercancel',pu);b.addEventListener('pointerleave',pu)};
+ bind('btn-jump',()=>{if(Player.grounded){Player.vy=7.6;Player.grounded=false;AudioSys.noise(AudioSys.ctx?AudioSys.ctx.currentTime:0,.1,.05,'lowpass',500)}});
+ bind('btn-sprint',()=>Input.sprint=true,()=>Input.sprint=false);
+ bind('btn-crouch',()=>{Player.crouch=!Player.crouch;$('btn-crouch').classList.toggle('active',Player.crouch)});
+ bind('btn-action',()=>{Input.actionHeld=true;doInteract()},()=>Input.actionHeld=false);
+ $('btn-inv').onclick=()=>{AudioSys.ensure();Modals.open('inv')};
+ $('btn-set').onclick=()=>{AudioSys.ensure();Modals.open('set')};
+ $('btn-mis').onclick=()=>{AudioSys.ensure();Modals.open('mis')};
+ document.addEventListener('contextmenu',e=>e.preventDefault());
+ document.addEventListener('pointerdown',()=>AudioSys.ensure(),{once:false});
+ addEventListener('pagehide',()=>saveNow());
+}
+function lookBy(dx,dy){const s=S.settings.sens*(S.settings.invert?-1:1);
+ Player.yaw-=dx*.0036*S.settings.sens;Player.pitch=clamp(Player.pitch-dy*.0036*s* (S.settings.invert?-1:1)*(S.settings.invert?1:1)*1,-1.35,1.35);
+ // simplify: apply invert only on Y
+ Player.pitch=clamp(Player.pitch,  -1.35,1.35)}
+// نسخة مبسطة وصحيحة للحساسية/العكس:
+function lookBy2(dx,dy){Player.yaw-=dx*.0036*S.settings.sens;
+ Player.pitch=clamp(Player.pitch+ (S.settings.invert?1:-1)*dy*.0036*S.settings.sens,-1.35,1.35)}
+
+/* ================= tool view (hands + tools) ================= */
+const Hands={root:null,anim:0,animDur:.4,animOn:false,
+ build(){if(this.root)camera.remove(this.root);this.root=new THREE.Group();
+  const skin=new THREE.MeshStandardMaterial({color:0xd9a377,roughness:.8});
+  const sleeve=new THREE.MeshStandardMaterial({color:0x5a6b4a,roughness:.9});
+  const mkArm=x=>{const g=new THREE.Group();const a=new THREE.Mesh(new THREE.BoxGeometry(.09,.09,.34),sleeve);a.position.z=-.05;
+   const h=new THREE.Mesh(new THREE.BoxGeometry(.085,.085,.1),skin);h.position.z=-.26;g.add(a,h);g.position.set(x,-.06,0);return g};
+  this.root.add(mkArm(-.14),mkArm(.14));
+  this.toolG=new THREE.Group();this.toolG.position.set(.14,-.05,-.28);this.root.add(this.toolG);
+  this.root.position.set(.26,-.34,-.48);camera.add(this.root);this.setTool(S.equipped)},
+ setTool(id){this.toolG.clear();const wood=new THREE.MeshStandardMaterial({color:0x8a5a33,roughness:.9});
+  const metal=new THREE.MeshStandardMaterial({color:0x9aa2aa,metalness:.7,roughness:.35});let g=this.toolG;
+  const handle=len=>{const h=new THREE.Mesh(new THREE.CylinderGeometry(.022,.028,len,8),wood);h.rotation.x=Math.PI/2*.85;g.add(h);return h};
+  if(id==='stick'){handle(.7)}
+  else if(id==='rakeS'||id==='rakeL'){const w=id==='rakeL'?.34:.22;handle(.85);
+   const bar=new THREE.Mesh(new THREE.BoxGeometry(w,.03,.03),metal);bar.position.set(0,.02,-.4);g.add(bar);
+   for(let i=0;i<(id==='rakeL'?7:5);i++){const t=new THREE.Mesh(new THREE.BoxGeometry(.015,.12,.015),metal);
+    t.position.set(-w/2+i*(w/(id==='rakeL'?6:4)),.02,-.43);g.add(t)}}
+  else if(id==='fork'){handle(.85);for(let i=-1;i<=1;i++){const t=new THREE.Mesh(new THREE.CylinderGeometry(.012,.008,.3,6),metal);
+   t.rotation.x=.5;t.position.set(i*.06,.06,-.44);g.add(t)}}
+  else if(id==='shovel'){handle(.8);const b=new THREE.Mesh(new THREE.BoxGeometry(.16,.02,.2),metal);b.position.set(0,.02,-.44);b.rotation.x=.4;g.add(b)}
+  else if(id==='magnet'){const red=new THREE.MeshStandardMaterial({color:0xd33,metalness:.5,roughness:.4});
+   const u=new THREE.Mesh(new THREE.TorusGeometry(.08,.03,8,14,Math.PI),red);u.position.set(0,.05,-.32);u.rotation.z=Math.PI;g.add(u);
+   handle(.3)}
+  else if(id==='vacuum'){const body=new THREE.Mesh(new THREE.BoxGeometry(.14,.16,.3),new THREE.MeshStandardMaterial({color:0xc86432,roughness:.6}));
+   body.position.set(0,.02,-.3);g.add(body);const tube=new THREE.Mesh(new THREE.CylinderGeometry(.035,.05,.3,8),metal);
+   tube.rotation.x=1.2;tube.position.set(0,0,-.46);g.add(tube)}
+  else{ // hands: قبضة صغيرة فقط
+   const f=new THREE.Mesh(new THREE.BoxGeometry(.06,.05,.07),new THREE.MeshStandardMaterial({color:0xd9a377}));f.position.set(0,0,-.05);g.add(f)}},
+ swing(){this.animOn=true;this.anim=0;AudioSys.swing()},
+ update(dt,spd){if(!this.root)return;if(this.animOn){this.anim+=dt/this.animDur;
+   if(this.anim>=1){this.animOn=false;this.anim=0}}
+  const t=this.anim,k=Math.sin(Math.min(1,t)*Math.PI);
+  this.root.rotation.x=-k*.95+Math.sin(Player.bobT)*.02*spd;
+  this.root.position.z=-.48+k*.12;this.root.position.y=-.34+Math.abs(Math.sin(Player.bobT))*.012*spd+k*.03;
+  this.root.position.x=.26+Math.sin(Player.bobT*.5)*.008*spd}};
+
+/* ================= interactions ================= */
+let hover=null,raycaster=new THREE.Raycaster(),hoverTimer=0;
+raycaster.far=7;
+function updateHover(dt){hoverTimer-=dt;
+ if(UI.modalOpen){UI.prompt(null);if(reticle)reticle.visible=false;return}
+ // zones
+ let zone=null;for(const z of ZONES){if(Math.hypot(Player.pos.x-z.x,Player.pos.z-z.z)<z.r)zone=z}
+ if(zone&&hoverTimer<=0){hover={type:'zone',zone};UI.prompt(zone.icon+' '+zone.label+' — اضغط ⛏');if(reticle)reticle.visible=false;return}
+ // hay
+ if(hoverTimer>0){if(hover&&hover.type==='hay')UI.prompt('⛏ إزالة القش (سعة '+effTool().cap+')');return}
+ hoverTimer=.12;
+ const near=Hay.nearest(Player.pos.x,Player.pos.z,4.5);
+ if(!near||near.aliveCount===0){hover=null;UI.prompt(null);if(reticle)reticle.visible=false;return}
+ const dir=new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(Player.pitch,Player.yaw,0,'YXZ'));
+ raycaster.set(camera.position,dir);
+ const hits=raycaster.intersectObject(near.mesh,false);
+ const hit=hits.find(h=>near.alive[h.instanceId]);
+ if(hit&&hit.distance<4.2){hover={type:'hay',pile:near,point:hit.point.clone()};
+  UI.prompt('⛏ إزالة القش (سعة '+effTool().cap+')');
+  if(reticle){reticle.visible=true;reticle.position.copy(hit.point).addScaledVector(dir,-.05);reticle.quaternion.copy(camera.quaternion)}}
+ else{hover=null;UI.prompt(null);if(reticle)reticle.visible=false}}
+let actionCd=0;
+function doInteract(){if(UI.modalOpen)return;updateHover(1);if(!hover)return;
+ if(hover.type==='zone'){Modals.open(hover.zone.id==='sell'?'sell':'shop');return}
+ if(hover.type==='hay')tryRemove(hover)}
+function tryRemove(h){const tool=effTool();
+ if(actionCd>0)return;
+ if(Player.stamina<tool.stam){UI.toast('أنت مرهق! استرح قليلًا','bad');AudioSys.deny();return}
+ const space=S.bagCap-invWeight();
+ if(space<ITEMS.hay.w){UI.toast('الحقيبة ممتلئة! بِع القش في منصة البيع 💰','bad');AudioSys.deny();return}
+ const pile=h.pile;
+ // إعادة تصويب سريع
+ const dir=new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(Player.pitch,Player.yaw,0,'YXZ'));
+ raycaster.set(camera.position,dir);const hits=raycaster.intersectObject(pile.mesh,false);
+ const hit=hits.find(x=>pile.alive[x.instanceId]);const point=hit?hit.point:h.point;
+ const res=Hay.removeAt(pile,point,tool.cap);
+ if(res.n===0)return;
+ actionCd=tool.cd;Player.stamina=Math.max(0,Player.stamina-tool.stam);
+ Hands.swing();AudioSys.hay();Player.pitchKick=-.012;Player.shake(.02);
+ Particles.burst(point,Math.min(14,6+res.n),0xd8b25a,1.8,2.2);
+ const added=invAdd('hay',res.n);
+ S.stats.hayRemoved+=res.n;gainXP(Math.ceil(res.n/2));
+ const strawN=Math.round(res.n*.12);if(strawN>0)invAdd('straw',strawN);
+ if(added<res.n)UI.toast('الحقيبة امتلأت أثناء الجمع!','bad');
+ rollLoot(pile,res.n,point,tool);
+ Bus.emit('inv');Bus.emit('stat');scheduleSave()}
+function chancePerPiece(p,n){return 1-Math.pow(1-p,n)}
+function rollLoot(pile,n,point,tool){let drops=0;
+ // نظام الرحمة لإبرة الدرس
+ if(pile.def.id==='p0'&&!S.pityDone){S.pity+=n;
+  if(S.pity>=30){S.pityDone=true;Pickups.spawn('needle',point);return}}
+ for(const[id,p,tag]of LOOT_TABLE){if(drops>=3)break;
+  let pp=p*(1+tool.rar);if(tag==='metal')pp*=tool.metal;
+  if(Math.random()<chancePerPiece(pp,n)){Pickups.spawn(id,point);drops++}}}
+
+/* ================= [MISSIONS] ================= */
+const MISSIONS=[
+ {id:'m1',n:'إزالة القش',d:'أزل 50 قطعة قش بيديك',t:50,g:()=>S.stats.hayRemoved,rw:{money:20}},
+ {id:'m2',n:'الإبرة الأولى',d:'اعثر على أول إبرة داخل القش',t:1,g:()=>S.stats.needles,rw:{money:50}},
+ {id:'m3',n:'عامل قش',d:'اجمع 150 قطعة قش',t:150,g:()=>S.stats.hayRemoved,rw:{money:40}},
+ {id:'m4',n:'البائع الأول',d:'بِع عناصر بقيمة $100',t:100,g:()=>Math.round(S.stats.soldValue),rw:{money:60}},
+ {id:'m5',n:'أداتك الأولى',d:'اشترِ أداة من المتجر',t:1,g:()=>S.stats.toolsBought,rw:{money:40}},
+ {id:'m6',n:'التاجر',d:'اجمع $500 من البيع',t:500,g:()=>Math.round(S.stats.soldValue),rw:{money:100}},
+ {id:'m7',n:'التطوير',d:'قم بترقية أي أداة',t:1,g:()=>S.stats.upgrades,rw:{money:80}},
+];
+function misBadge(){let any=false;for(const m of MISSIONS){const st=S.missions[m.id]||{};
+ if(!st.claimed&&m.g()>=m.t)any=true}$('mis-badge').classList.toggle('on',any)}
+
+/* ================= [TUTORIAL] ================= */
+const TUT=[
+ 'مرحبًا بك في HAYSTACK 🌾 استخدم عصا التحكم اليسرى للمشي',
+ 'اسحب بإصبعك على الشاشة للنظر حولك 👀',
+ 'اقترب من كومة القش القريبة منك',
+ 'اضغط زر ⛏ الذهبي (أو استمر بالضغط) لإزالة القش',
+ 'هناك إبرة مفقودة داخل هذا القش… واصل البحث حتى تجدها 🪡',
+ 'رائع! الآن بِع القش في منصة البيع الخضراء 💰',
+ 'أخيرًا: اشترِ أداتك الأولى من المتجر الأزرق 🛒',
+];
+let tutAcc=0;
+function tutUpdate(dt){if(!S||S.tut>=TUT.length){$('tut-bar').classList.add('hide');return}
+ $('tut-bar').classList.remove('hide');$('tut-text').textContent=TUT[S.tut];
+ const dots=$('tut-dots');if(dots.childElementCount!==TUT.length){dots.innerHTML='';TUT.forEach(()=>dots.appendChild(document.createElement('i')))}
+ [...dots.children].forEach((d,i)=>d.classList.toggle('done',i<=S.tut));
+ let done=false;
+ switch(S.tut){
+  case 0:tutAcc+=Math.hypot(Input.joy.x,Input.joy.y)*dt;if(tutAcc>1.5)done=true;break;
+  case 1:if(Player.lookDist>160)done=true;break;
+  case 2:if(Hay.piles.some(p=>Math.hypot(Player.pos.x-p.def.x,Player.pos.z-p.def.z)<p.def.R+2.5))done=true;break;
+  case 3:if(S.stats.hayRemoved>=1)done=true;break;
+  case 4:if(S.stats.needles>=1)done=true;break;
+  case 5:if(S.stats.soldValue>0)done=true;break;
+  case 6:if(S.stats.toolsBought>=1)done=true;break}
+ if(done){S.tut++;AudioSys.coin();UI.toast('✔ خطوة مكتملة','gold');
+  if(S.tut>=TUT.length){UI.toast('انتهى الدرس! المزرعة ملكك الآن 🎉','gold');$('tut-bar').classList.add('hide')}
+  scheduleSave()}}
+$('tut-skip').onclick=()=>{S.tut=TUT.length;$('tut-bar').classList.add('hide');scheduleSave()};
+
+/* ================= [UI] Modals ================= */
+const Modals={cur:null,
+ open(id){this.cur=id;UI.modalOpen=true;$('modal-root').classList.add('on');this.render()},
+ close(){this.cur=null;UI.modalOpen=false;$('modal-root').classList.remove('on');Input.actionHeld=false},
+ render(){const b=$('sheet-body');b.innerHTML='';const T=$('sheet-title');
+  if(this.cur==='inv'){T.textContent='🎒 الحقيبة';b.appendChild(this.invView())}
+  else if(this.cur==='shop'){T.textContent='🛒 المتجر';b.appendChild(this.shopView())}
+  else if(this.cur==='sell'){T.textContent='💰 منصة البيع';b.appendChild(this.sellView())}
+  else if(this.cur==='mis'){T.textContent='📜 المهام';b.appendChild(this.misView())}
+  else if(this.cur==='set'){T.textContent='⚙️ الإعدادات';b.appendChild(this.setView())}
+  b.scrollTop=0},
+ row(ic,name,desc,rarity,extra){const r=document.createElement('div');r.className='row';
+  const icc=document.createElement('div');icc.className='ic';icc.style.borderColor=RARITY[rarity].c;icc.style.background=RARITY[rarity].c+'22';icc.textContent=ic;
+  const info=document.createElement('div');info.className='info';
+  info.innerHTML=`<div class="nm">${name}</div><div class="ds">${desc}</div>`;if(extra)info.insertAdjacentHTML('beforeend',extra);
+  r.append(icc,info);return r},
+ btn(txt,cls,fn){const b=document.createElement('button');b.className='btn '+cls;b.textContent=txt;b.onclick=fn;return b},
+ invView(){const w=document.createElement('div');
+  const tabs=document.createElement('div');tabs.className='tabs';
+  const t1=this.btn('العناصر','alt',()=>show('items')),t2=this.btn('الأدوات','alt',()=>show('tools'));
+  tabs.append(t1,t2);w.appendChild(tabs);
+  const body=document.createElement('div');w.appendChild(body);
+  const wl=document.createElement('div');wl.className='wlabel';
+  const wb=document.createElement('div');wb.id='weight-bar';const wf=document.createElement('div');wf.id='weight-fill';
+  wb.appendChild(wf);w.append(wl,wb);
+  const updW=()=>{const wt=invWeight();wl.textContent=`الوزن: ${wt.toFixed(1)} / ${S.bagCap} كجم`;
+   wf.style.width=Math.min(100,wt/S.bagCap*100)+'%';wf.style.background=wt/S.bagCap>.9?'#ff5252':''};
+  const show=tab=>{t1.classList.toggle('on',tab==='items');t2.classList.toggle('on',tab==='tools');body.innerHTML='';
+   if(tab==='items'){const grid=document.createElement('div');grid.className='grid';
+    const entries=Object.entries(S.inv).filter(([k,v])=>v>0&&ITEMS[k]);
+    entries.sort((a,b)=>RARITY[ITEMS[b[0]].r].xp-RARITY[ITEMS[a[0]].r].xp);
+    for(const[id,q]of entries){const it=ITEMS[id];const s=document.createElement('div');s.className='slot';
+     s.style.borderColor=RARITY[it.r].c;s.innerHTML=`<span>${it.i}</span><span class="q">${q}</span>`;
+     s.onclick=()=>this.detail(id);grid.appendChild(s)}
+    for(let i=entries.length;i<20;i++){const s=document.createElement('div');s.className='slot empty';s.textContent='·';grid.appendChild(s)}
+    body.appendChild(grid);updW()}
+   else{for(const id in S.tools){const t=TOOLS[id],lvl=S.tools[id].lvl||0;
+     const r=this.row(id==='hands'?'✋':'🛠',t.n+(lvl?` +${lvl}`:''),t.d,'common',
+      `<div class="st">سعة ${Math.round(t.cap*(1+.3*lvl))} · سرعة ${(t.cd*Math.pow(.92,lvl)).toFixed(2)}ث · ندرة +${Math.round((t.rar+.15*lvl)*100)}%</div>`);
+     if(S.equipped===id){const b=this.btn('مُجهَّزة ✓','alt',null);b.disabled=true;r.appendChild(b)}
+     else r.appendChild(this.btn('تجهيز','',( )=>{S.equipped=id;Hands.setTool(id);UI.hud();AudioSys.buy();this.render();scheduleSave()}));
+     body.appendChild(r)}}};
+  show('items');return w},
+ detail(id){const it=ITEMS[id],R=RARITY[it.r];
+  const p=document.createElement('div');p.className='detail-pop';
+  p.innerHTML=`<div style="font-size:52px;text-align:center;color:${R.c};filter:drop-shadow(0 0 12px ${R.c})">${it.i}</div>
+   <div style="text-align:center;font-weight:900;font-size:20px">${it.n}</div>
+   <div style="text-align:center;font-size:12px;color:${R.c};font-weight:900">${R.n} · $${it.v} · ${it.w} كجم</div>
+   <div style="text-align:center;font-size:13px;color:var(--dim)">${it.d}</div>
+   <div style="text-align:center;font-size:13px">تملك: <b>${S.inv[id]||0}</b></div>`;
+  p.appendChild(this.btn('إغلاق','alt',()=>p.remove()));$('sheet-body').appendChild(p)},
+ shopView(){const w=document.createElement('div');
+  const head=document.createElement('div');head.style.cssText='font-size:12px;color:var(--dim);margin-bottom:10px';
+  head.textContent='كل أداة تُغيّر اللعب فعليًا: السعة = كمية القش لكل ضربة، الندرة = فرصة أكبر للعثور على الأشياء الثمينة.';
+  w.appendChild(head);
+  for(const id in TOOLS){const t=TOOLS[id];const owned=!!S.tools[id];const lvl=owned?(S.tools[id].lvl||0):0;
+   const r=this.row(id==='hands'?'✋':'🛠',t.n+(lvl?` +${lvl}`:''),t.d,'common',
+    `<div class="st">سعة ${Math.round(t.cap*(1+.3*lvl))} · سرعة ${(t.cd*Math.pow(.92,lvl)).toFixed(2)}ث · ندرة +${Math.round((t.rar+.15*lvl)*100)}% · طاقة ${t.stam}</div>`);
+   if(!owned){const b=this.btn('$'+t.price,'',()=>{if(S.money<t.price){UI.toast('لا تملك ما يكفي من المال','bad');AudioSys.deny();return}
+     S.money-=t.price;S.tools[id]={lvl:0};S.stats.toolsBought++;AudioSys.buy();
+     UI.toast('اشتريت '+t.n+'! جهّزها من الحقيبة 🎒','gold');Bus.emit('money');Bus.emit('stat');this.render();scheduleSave()});
+    if(S.money<t.price)b.style.opacity=.55;r.appendChild(b)}
+   else{if(lvl<3){const c=upCost(id);const b=this.btn('ترقية $'+c,'grn',()=>{if(S.money<c){UI.toast('لا تملك ما يكفي للترقية','bad');AudioSys.deny();return}
+     S.money-=c;S.tools[id].lvl=lvl+1;S.stats.upgrades++;AudioSys.buy();UI.toast('تمت ترقية '+t.n+' إلى +'+(lvl+1)+' ⬆','gold');
+     Bus.emit('money');Bus.emit('stat');this.render();scheduleSave()});
+    if(S.money<c)b.style.opacity=.55;r.appendChild(b)}
+    else{const b=this.btn('أقصى مستوى','alt',null);b.disabled=true;r.appendChild(b)}}
+   w.appendChild(r)}
+  // ترقية الحقيبة
+  const c=bagCost();const r=this.row('🎒','حقيبة أكبر',`زيادة سعة الحقيبة +25 كجم (الحالية ${S.bagCap} كجم)`,'uncommon');
+  const b=this.btn('$'+c,'',()=>{if(S.money<c){UI.toast('لا تملك ما يكفي','bad');AudioSys.deny();return}
+   S.money-=c;S.bagLvl++;S.bagCap+=25;AudioSys.buy();UI.toast('أصبحت حقيبتك تتسع '+S.bagCap+' كجم!','gold');
+   Bus.emit('money');this.render();scheduleSave()});
+  if(S.money<c)b.style.opacity=.55;r.appendChild(b);w.appendChild(r);return w},
+ sellView(){const w=document.createElement('div');
+  const entries=Object.entries(S.inv).filter(([k,v])=>v>0&&ITEMS[k]&&ITEMS[k].v>0&&ITEMS[k].c!=='tool');
+  if(!entries.length){w.innerHTML='<div style="text-align:center;color:var(--dim);padding:30px">لا شيء للبيع.<br>اجمع القش وابحث في الأكوام! 🌾</div>';return w}
+  const sum=document.createElement('div');sum.style.cssText='font-size:12px;color:var(--dim);margin-bottom:10px';
+  const total=entries.reduce((a,[k,v])=>a+ITEMS[k].v*v,0);sum.textContent=`قيمة كل ما تملكه: $${fmt(total)}`;w.appendChild(sum);
+  const sellAll=this.btn('💰 بيع الكل ($'+fmt(total)+')','grn',()=>{let gain=0,wasNeedle=false;
+   for(const[k,v]of Object.entries(S.inv)){if(v>0&&ITEMS[k]&&ITEMS[k].c!=='tool'){gain+=ITEMS[k].v*v;delete S.inv[k]}}
+   if(gain>0){addMoney(gain,true);S.stats.soldValue+=gain;gainXP(Math.floor(gain/8));AudioSys.sell();
+    UI.toast('بعت كل شيء مقابل $'+fmt(gain)+' 💰','gold');Bus.emit('stat');Bus.emit('inv');this.render();scheduleSave()}});
+  w.appendChild(sellAll);
+  for(const[id,q]of entries){const it=ITEMS[id];
+   const r=this.row(it.i,`${it.n} ×${q}`,`سعر الوحدة $${it.v}`,it.r);
+   r.appendChild(this.btn('بيع 1','',()=>{S.inv[id]--;if(S.inv[id]<=0)delete S.inv[id];
+    addMoney(it.v,true);S.stats.soldValue+=it.v;gainXP(Math.max(1,Math.floor(it.v/8)));AudioSys.sell();
+    Bus.emit('stat');Bus.emit('inv');this.render();scheduleSave()}));
+   r.appendChild(this.btn('بيع الكل','',( )=>{const gain=it.v*q;delete S.inv[id];
+    addMoney(gain,true);S.stats.soldValue+=gain;gainXP(Math.max(1,Math.floor(gain/8)));AudioSys.sell();
+    UI.toast('+$'+fmt(gain),'gold');Bus.emit('stat');Bus.emit('inv');this.render();scheduleSave()}));
+   w.appendChild(r)}
+  return w},
+ misView(){const w=document.createElement('div');
+  for(const m of MISSIONS){const st=S.missions[m.id]||{};const prog=Math.min(m.t,m.g());const done=prog>=m.t;
+   const r=this.row(done?'✅':'📌',m.n,m.d,'common',
+    `<div class="pbar"><i style="width:${prog/m.t*100}%"></i></div><div class="st">${fmt(prog)} / ${fmt(m.t)} — مكافأة $${m.rw.money}</div>`);
+   if(st.claimed){const b=this.btn('مكتملة ✓','alt',null);b.disabled=true;r.appendChild(b)}
+   else if(done){r.appendChild(this.btn('مطالبة 🎁','grn',()=>{S.missions[m.id]={claimed:true};
+    addMoney(m.rw.money,false);gainXP(30);AudioSys.fanfare();UI.toast('مكافأة المهمة: $'+m.rw.money,'gold');
+    Bus.emit('stat');this.render();misBadge();scheduleSave()}))}
+   else{const b=this.btn('…','alt',null);b.disabled=true;r.appendChild(b)}
+   w.appendChild(r)}
+  return w},
+ setView(){const w=document.createElement('div');
+  const mk=(label,ctrl)=>{const r=document.createElement('div');r.className='set-row';
+   const l=document.createElement('div');l.textContent=label;r.append(l,ctrl);return r};
+  const sens=document.createElement('input');sens.type='range';sens.min=.4;sens.max=3;sens.step=.1;sens.value=S.settings.sens;
+  sens.oninput=()=>S.settings.sens=+sens.value;sens.onchange=scheduleSave;
+  w.appendChild(mk('حساسية النظر',sens));
+  const fov=document.createElement('input');fov.type='range';fov.min=60;fov.max=100;fov.step=1;fov.value=S.settings.fov;
+  fov.oninput=()=>{S.settings.fov=+fov.value;Player.fov=S.settings.fov};fov.onchange=scheduleSave;
+  w.appendChild(mk('مجال الرؤية (FOV)',fov));
+  const q=document.createElement('select');['low','med','high'].forEach(v=>{const o=document.createElement('option');
+   o.value=v;o.textContent={low:'منخفض (أداء أعلى)',med:'متوسط',high:'عالي'}[v];if(S.settings.quality===v)o.selected=true;q.appendChild(o)});
+  q.onchange=()=>{applyQuality(q.value);UI.toast('تم تطبيق جودة الرسوميات')};
+  w.appendChild(mk('جودة الرسوميات',q));
+  const aud=document.createElement('button');aud.className='toggle'+(S.settings.audio?' on':'');aud.textContent=S.settings.audio?'🔊 الصوت: يعمل':'🔇 الصوت: متوقف';
+  aud.onclick=()=>{S.settings.audio=!S.settings.audio;AudioSys.on=S.settings.audio;
+   if(AudioSys.master)AudioSys.master.gain.value=S.settings.audio?.5:0;
+   aud.className='toggle'+(S.settings.audio?' on':'');aud.textContent=S.settings.audio?'🔊 الصوت: يعمل':'🔇 الصوت: متوقف';scheduleSave()};
+  w.appendChild(mk('الصوت',aud));
+  const inv=document.createElement('button');inv.className='toggle'+(S.settings.invert?' on':'');inv.textContent=S.settings.invert?'معكوس ↕':'عادي ↕';
+  inv.onclick=()=>{S.settings.invert=!S.settings.invert;inv.className='toggle'+(S.settings.invert?' on':'');inv.textContent=S.settings.invert?'معكوس ↕':'عادي ↕';scheduleSave()};
+  w.appendChild(mk('عكس محور النظر',inv));
+  const saveB=this.btn('💾 حفظ الآن','',( )=>{saveNow();UI.toast('تم الحفظ ✓','gold')});
+  const tutB=this.btn('🔁 إعادة الدرس التعليمي','alt',()=>{S.tut=0;tutAcc=0;Player.lookDist=0;this.close();scheduleSave()});
+  const resetB=this.btn('🗑 مسح الحفظ والبدء من جديد','alt',()=>{if(confirm('سيتم مسح كل تقدمك نهائيًا. هل أنت متأكد؟')){SaveSys.del('save');location.reload()}});
+  const about=document.createElement('div');about.style.cssText='font-size:11px;color:var(--dim);text-align:center;margin-top:14px';
+  about.innerHTML='HAYSTACK v0.1.0 — المرحلة الأولى ⛏<br>من البحث باليدين… إلى إمبراطورية القش.';
+  const col=document.createElement('div');col.style.cssText='display:flex;flex-direction:column;gap:8px;margin-top:10px';
+  col.append(saveB,tutB,resetB);w.append(col,about);return w}};
+$('sheet-close').onclick=()=>Modals.close();$('backdrop').onclick=()=>Modals.close();
+
+/* ================= game loop ================= */
+let last=performance.now(),fpsAcc=0,fpsN=0,fpsT=0;
+const FWD=new THREE.Vector3(),RIGHT=new THREE.Vector3(),MOVE=new THREE.Vector3(),TMP=new THREE.Vector3();
+function update(dt){
+ // movement input
+ let mx=Input.joy.x,my=Input.joy.y;
+ if(Input.keys.KeyW)my+=1;if(Input.keys.KeyS)my-=1;if(Input.keys.KeyA)mx-=1;if(Input.keys.KeyD)mx+=1;
+ const k=Math.hypot(mx,my);if(k>1){mx/=k;my/=k}
+ const moving=k>.08;
+ const sprint=(Input.sprint||Input.keys.ShiftLeft)&&moving&&!Player.crouch&&Player.stamina>1;
+ let spd=Player.crouch?1.7:(sprint?6.6:3.4);
+ FWD.set(-Math.sin(Player.yaw),0,-Math.cos(Player.yaw));
+ // mلاحظة: عند yaw=0 ننظر نحو -z
+ RIGHT.set(Math.cos(Player.yaw),0,-Math.sin(Player.yaw));
+ MOVE.set(0,0,0).addScaledVector(FWD,my).addScaledVector(RIGHT,mx);
+ if(MOVE.lengthSq()>0)MOVE.normalize();
+ Player.pos.addScaledVector(MOVE,spd*dt);
+ // stamina
+ if(sprint)Player.stamina=Math.max(0,Player.stamina-16*dt);
+ else Player.stamina=Math.min(100,Player.stamina+(moving?9:14)*dt);
+ UI.stamina();
+ // gravity / jump
+ Player.vy-=22*dt;let ny=Player.pos.y+Player.vy*dt;
+ if(ny<=0){if(!Player.grounded&&Player.vy<-5){Particules:0;Particles.burst(new THREE.Vector3(Player.pos.x,0,Player.pos.z),6,0x9b8a6a,1.4,1)}
+  Player.pos.y=0;Player.vy=0;Player.grounded=true}else{Player.pos.y=ny;Player.grounded=false}
+ // collision (circles)
+ for(const c of Colliders){const dx=Player.pos.x-c.x,dz=Player.pos.z-c.z;const d=Math.hypot(dx,dz),min=c.r+.42;
+  if(d<min&&d>.0001){const push=(min-d)/d;Player.pos.x+=dx*push;Player.pos.z+=dz*push}}
+ Player.pos.x=clamp(Player.pos.x,-33,33);Player.pos.z=clamp(Player.pos.z,-28,28);
+ Player.moveDist+=spd*dt*(moving?1:0);
+ // head bob & footsteps
+ const spdNow=moving?spd:0;
+ if(Player.grounded&&moving){Player.bobT+=dt*spdNow*1.7;Player.stepT-=dt*spdNow;
+  if(Player.stepT<=0){Player.stepT=2.1;AudioSys.step(sprint)}}
+ // camera
+ Player.pitchKick=lerp(Player.pitchKick,0,Math.min(1,dt*8));
+ Player.shakeAmp=Math.max(0,Player.shakeAmp-dt*.5);
+ const shx=(Math.random()-.5)*Player.shakeAmp,shy=(Math.random()-.5)*Player.shakeAmp;
+ const bobY=Player.grounded&&moving?Math.abs(Math.sin(Player.bobT))*.05:0;
+ camera.position.set(Player.pos.x+shx,Player.eye()+Player.pos.y+bobY+shy,Player.pos.z);
+ camera.rotation.set(Player.pitch+Player.pitchKick,Player.yaw,0);
+ // fov
+ const tfov=sprint?S.settings.fov+8:(Player.crouch?S.settings.fov-4:S.settings.fov);
+ camera.fov=lerp(camera.fov,tfov,Math.min(1,dt*5));camera.updateProjectionMatrix();
+ // interact repeat
+ actionCd=Math.max(0,actionCd-dt);
+ if(Input.actionHeld&&actionCd<=0&&!UI.modalOpen)doInteract();
+ // systems
+ updateHover(dt);
+ Hands.update(dt,moving?spd/3.4:0);
+ const camPos=camera.position;
+ Pickups.update(dt,new THREE.Vector3(Player.pos.x,Player.pos.y+.8,Player.pos.z));
+ Particles.update(dt);Floaters.update(dt);
+ for(const z of ZONES)if(z.beam)z.beam.rotation.y+=dt*.5;
+ for(const c of Clouds)c.position.x+=dt*.6;
+ tutUpdate(dt);misBadge();
+ // fps
+ fpsN++;fpsT+=dt;if(fpsT>=1){$('fps-tag').textContent=Math.round(fpsN/fpsT)+' FPS';fpsN=0;fpsT=0}}
+function loop(now){requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/1000);last=now;
+ update(dt);renderer.render(scene,camera)}
+
+/* ================= boot ================= */
+const TIPS=['الإبر الذهبية أثمن مما تظن…','المغناطيس يضاعف فرص العثور على المعادن','بِع القش بانتظام لتوسيع حقيبتك','الأدوات الأفضل = سعة أكبر لكل ضربة','الإبرة العتيقة أسطورة… أم حقيقة؟'];
+async function boot(){
+ drawLogo();$('load-tip').textContent=TIPS[0];
+ await SaveSys.init();$('load-fill').style.width='25%';
+ const raw=await SaveSys.get('save');
+ S=Object.assign(freshState(),raw||{});
+ S.settings=Object.assign(freshState().settings,raw?.settings||{});
+ S.stats=Object.assign(freshState().stats,raw?.stats||{});
+ if(raw){const f=freshState();S.inv=Object.assign({},raw.inv||{});S.tools=Object.assign({hands:{lvl:0}},raw.tools||{});
+  S.missions=raw.missions||{};S.piles=raw.piles||{};if(!TOOLS[S.equipped])S.equipped='hands'}
+ AudioSys.on=S.settings.audio;
+ $('load-fill').style.width='40%';$('load-tip').textContent='بناء المزرعة…';
+ makeTextures();initThree();scene.add(camera);
+ const q=QUALITY[S.settings.quality];renderer.setPixelRatio(Math.min(devicePixelRatio,q.dpr));
+ buildWorld();
+ for(const c of[...Colliders])c.hayCol=false; // colliders الأكوام تُضاف في Hay.build
+ Hay.build(q.pieces);
+ for(const p of Hay.piles){const cc={x:p.def.x,z:p.def.z,r:p.def.R*.55,hayCol:true};
+  if(!Colliders.some(c=>c.hayCol&&c.x===cc.x&&c.z===cc.z))Colliders.push(cc)}
+ Particles.init();Floaters.init();initReticle();Hands.build();
+ initInput();UI.hud();UI.stamina();
+ Player.fov=S.settings.fov;camera.fov=S.settings.fov;
+ $('load-fill').style.width='80%';$('load-tip').textContent='تشغيل الأنظمة…';
+ setInterval(()=>saveNow(),20000);
+ setInterval(misBadge,1500);
+ if(raw&&Date.now()-S.ts<1000*60*60*24*30)UI.toast('مرحبًا بعودتك! تم تحميل حفظك ✓','gold');
+ else UI.toast('ابحث عن الإبرة في كومة القش! 🪡','gold');
+ $('load-fill').style.width='100%';
+ setTimeout(()=>{$('loading').style.transition='opacity .5s';$('loading').style.opacity=0;
+  setTimeout(()=>$('loading').remove(),520)},350);
+ requestAnimationFrame(loop);
+ console.log('%cHAYSTACK v0.1.0 — Stage 1 ready ⛏','color:#ffb52e;font-weight:bold;font-size:14px');
+}
+// إصلاح: إزالة مكررات أزرار النظر (زر 👀 غير ضروري) — نُبقيه يعيد توسيط الكاميرا فقط
+$('btn-punch').addEventListener('pointerdown',e=>{e.preventDefault();Player.pitch=0;AudioSys.ensure()});
+boot().catch(e=>{console.error(e);$('load-tip').textContent='خطأ في التحميل: '+e.message;$('load-tip').style.color='#ff6b6b'});
+</script>
 </body>
 </html>
