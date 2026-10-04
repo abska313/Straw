@@ -2,8 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <!-- ============================================================
-  HAYSTACK — v0.1.0 (المرحلة الأولى + دعم PWA كامل)
-  محرك: Three.js (WebGL) — ملف واحد منظم بوحدات/كلاسات
+  HAYSTACK — v0.2.0 (تحكم لمسي محسّن + دعم PWA متكامل)
 ============================================================ -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -35,7 +34,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0d0a06;font-family:
 canvas{display:block}
 #app{position:fixed;inset:0}
 #app canvas{position:absolute;inset:0;z-index:0}
-#touch-layer{position:absolute;inset:0;z-index:1}
+
+/* مساحات اللمس المستقلة لضمان دقة التحكم */
+#controls-layer{position:absolute;inset:0;z-index:2;pointer-events:none}
+#touch-look-zone{position:absolute;top:0;right:0;width:55vw;height:100%;pointer-events:auto;touch-action:none}
+#touch-move-zone{position:absolute;top:0;left:0;width:45vw;height:100%;pointer-events:auto;touch-action:none}
+
 button{font-family:inherit;color:inherit;border:none;background:none;cursor:pointer}
 .hide{display:none!important}
 
@@ -44,120 +48,136 @@ button{font-family:inherit;color:inherit;border:none;background:none;cursor:poin
 #hud .chip{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:4px 12px;backdrop-filter:blur(6px);display:flex;align-items:center;gap:8px;font-weight:700}
 #top-bar{position:absolute;top:calc(8px + var(--sat));right:calc(10px + var(--sar));left:calc(10px + var(--sal));display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 #stat-group{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-#money-chip{color:#ffd76a;font-size:16px}
-#lvl-chip{flex-direction:column;align-items:flex-start;gap:2px;padding:4px 12px;font-size:12px}
-#xp-bar{width:110px;height:6px;background:#0008;border-radius:4px;overflow:hidden}
+#money-chip{color:#ffd76a;font-size:15px}
+#lvl-chip{flex-direction:column;align-items:flex-start;gap:2px;padding:4px 12px;font-size:11px}
+#xp-bar{width:90px;height:5px;background:#0008;border-radius:4px;overflow:hidden}
 #xp-fill{height:100%;width:0%;background:linear-gradient(90deg,#7ec850,#c8ff5e);border-radius:4px;transition:width .3s}
 #stamina-wrap{flex-direction:column;align-items:flex-start;gap:2px;padding:4px 12px;font-size:11px}
-#sta-bar{width:90px;height:7px;background:#0008;border-radius:4px;overflow:hidden}
+#sta-bar{width:80px;height:6px;background:#0008;border-radius:4px;overflow:hidden}
 #sta-fill{height:100%;width:100%;background:linear-gradient(90deg,#38c8f0,#7ef0ff);border-radius:4px}
 #sta-fill.low{background:linear-gradient(90deg,#ff5b4d,#ff9d5c)}
 #tool-chip{font-size:12px;color:var(--dim)}
 #tool-chip b{color:var(--amber)}
-#menu-col{display:flex;flex-direction:column;gap:8px;pointer-events:auto}
-.menu-btn{width:46px;height:46px;border-radius:14px;background:var(--panel);border:1px solid var(--line);font-size:20px;display:flex;align-items:center;justify-content:center;position:relative;backdrop-filter:blur(6px)}
+#menu-col{display:flex;gap:8px;pointer-events:auto}
+.menu-btn{width:42px;height:42px;border-radius:12px;background:var(--panel);border:1px solid var(--line);font-size:18px;display:flex;align-items:center;justify-content:center;position:relative;backdrop-filter:blur(6px)}
 .menu-btn:active{transform:scale(.92);background:var(--panel2)}
-#btn-install{background:linear-gradient(135deg,#ffb52e,#ff8c1a);color:#3a2405;display:none;font-size:18px;font-weight:900}
-.badge{position:absolute;top:-3px;left:-3px;width:12px;height:12px;border-radius:50%;background:#ff5252;border:2px solid #1c150d;display:none}
+#btn-install{background:linear-gradient(135deg,#ffb52e,#ff8c1a);color:#3a2405;font-weight:900;display:none}
+.badge{position:absolute;top:-3px;left:-3px;width:10px;height:10px;border-radius:50%;background:#ff5252;border:2px solid #1c150d;display:none}
 .badge.on{display:block}
-#crosshair{position:absolute;top:50%;left:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:#ffffffcc;box-shadow:0 0 6px #000a}
-#prompt{position:absolute;bottom:calc(172px + var(--sab));left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--amber);color:var(--amber);border-radius:20px;padding:6px 18px;font-weight:700;font-size:14px;display:none;white-space:nowrap;animation:pulse 1.4s infinite;backdrop-filter:blur(6px)}
+#crosshair{position:absolute;top:50%;left:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:#ffffffcc;box-shadow:0 0 6px #000a;pointer-events:none}
+#prompt{position:absolute;bottom:calc(160px + var(--sab));left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--amber);color:var(--amber);border-radius:20px;padding:6px 18px;font-weight:700;font-size:13px;display:none;white-space:nowrap;animation:pulse 1.4s infinite;backdrop-filter:blur(6px);pointer-events:none}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 #ffb52e55}50%{box-shadow:0 0 0 9px #ffb52e00}}
 
-/* ---------- أزرار التحكم ---------- */
-#joy-zone{position:absolute;left:0;bottom:0;width:44vw;height:62vh;z-index:2}
-#joy-base{position:absolute;width:118px;height:118px;border-radius:50%;background:#ffffff14;border:2px solid #ffffff30;display:none;transform:translate(-50%,-50%)}
-#joy-knob{position:absolute;width:54px;height:54px;border-radius:50%;background:#ffcf7acc;border:2px solid #fff8;transform:translate(-50%,-50%);box-shadow:0 4px 12px #0007}
-#btn-cluster{position:absolute;right:calc(12px + var(--sar));bottom:calc(14px + var(--sab));z-index:3;display:grid;grid-template-columns:repeat(2,64px);grid-auto-rows:64px;gap:10px}
-.cbtn{border-radius:50%;background:#1c150dcc;border:2px solid #5a4426aa;color:var(--txt);font-size:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(4px);touch-action:none}
-.cbtn small{font-size:9px;font-weight:700;opacity:.85}
-.cbtn:active,.cbtn.active{background:#ffb52e33;border-color:var(--amber);transform:scale(.94)}
-#btn-action{position:absolute;right:calc(96px + var(--sar));bottom:calc(84px + var(--sab));width:84px;height:84px;border-radius:50%;background:linear-gradient(160deg,#ffb52e,#ff8c1a);color:#3a2405;font-size:30px;border:3px solid #ffe0a0;box-shadow:0 6px 18px #0009;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:3;touch-action:none}
-#btn-action small{font-size:10px;font-weight:900}
-#btn-action:active{transform:scale(.93)}
+/* ---------- أزرار التحكم والـ Joystick المحسّن ---------- */
+#joy-container{position:absolute;bottom:calc(25px + var(--sab));left:calc(25px + var(--sal));width:124px;height:124px;border-radius:50%;background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;pointer-events:none}
+#joy-knob{width:54px;height:54px;border-radius:50%;background:radial-gradient(circle,#ffcf7a,#e69926);box-shadow:0 4px 14px rgba(0,0,0,0.6);border:2px solid #fff;transform:translate(0px,0px);pointer-events:none;will-change:transform}
 
-/* ---------- الدرس ---------- */
-#tut-bar{position:absolute;top:calc(64px + var(--sat));left:50%;transform:translateX(-50%);z-index:4;background:var(--panel2);border:1px solid var(--amber);border-radius:16px;padding:8px 16px;display:flex;align-items:center;gap:12px;max-width:88vw;backdrop-filter:blur(8px)}
-#tut-text{font-size:13px;font-weight:700}
-#tut-skip{pointer-events:auto;font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:10px;padding:3px 10px}
+#btn-cluster{position:absolute;right:calc(16px + var(--sar));bottom:calc(16px + var(--sab));z-index:5;display:flex;gap:12px;align-items:flex-end;pointer-events:auto}
+.cbtn-col{display:flex;flex-direction:column;gap:10px}
+.cbtn{width:56px;height:56px;border-radius:50%;background:rgba(28,21,13,0.88);border:2px solid var(--line);color:var(--txt);font-size:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(6px);touch-action:none}
+.cbtn small{font-size:9px;font-weight:700;opacity:.85}
+.cbtn:active,.cbtn.active{background:rgba(255,181,46,0.3);border-color:var(--amber);transform:scale(.92)}
+
+#btn-action{width:76px;height:76px;border-radius:50%;background:linear-gradient(160deg,#ffb52e,#ff8c1a);color:#3a2405;font-size:26px;border:3px solid #ffe0a0;box-shadow:0 6px 18px rgba(0,0,0,0.6);display:flex;flex-direction:column;align-items:center;justify-content:center;touch-action:none;pointer-events:auto}
+#btn-action small{font-size:10px;font-weight:900}
+#btn-action:active{transform:scale(.92)}
+
+/* ---------- بقية القوائم والنوافذ ---------- */
+#tut-bar{position:absolute;top:calc(56px + var(--sat));left:50%;transform:translateX(-50%);z-index:4;background:var(--panel2);border:1px solid var(--amber);border-radius:16px;padding:6px 14px;display:flex;align-items:center;gap:10px;max-width:90vw;backdrop-filter:blur(8px)}
+#tut-text{font-size:12px;font-weight:700}
+#tut-skip{pointer-events:auto;font-size:10px;color:var(--dim);border:1px solid var(--line);border-radius:8px;padding:2px 8px}
 #tut-dots{display:flex;gap:4px}
-#tut-dots i{width:7px;height:7px;border-radius:50%;background:#5a4426}
+#tut-dots i{width:6px;height:6px;border-radius:50%;background:#5a4426}
 #tut-dots i.done{background:var(--amber)}
 
-/* ---------- toasts ---------- */
-#toasts{position:absolute;top:calc(100px + var(--sat));left:50%;transform:translateX(-50%);z-index:9;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
-.toast{background:#1c150df0;border:1px solid var(--line);border-radius:14px;padding:6px 16px;font-size:13px;font-weight:700;animation:tin .25s ease;max-width:82vw;text-align:center}
+#toasts{position:absolute;top:calc(90px + var(--sat));left:50%;transform:translateX(-50%);z-index:9;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+.toast{background:#1c150df0;border:1px solid var(--line);border-radius:14px;padding:6px 16px;font-size:12px;font-weight:700;animation:tin .25s ease;max-width:85vw;text-align:center}
 .toast.gold{border-color:var(--amber);color:var(--amber)}
 .toast.bad{border-color:#ff5252;color:#ff8a80}
 @keyframes tin{from{opacity:0;transform:translateY(-8px)}to{opacity:1}}
 
-/* ---------- اكتشاف نادر ---------- */
 #discovery{position:absolute;inset:0;z-index:12;display:flex;align-items:center;justify-content:center;background:#000000aa;opacity:0;pointer-events:none;transition:opacity .3s}
 #discovery.on{opacity:1}
-#disc-card{background:linear-gradient(160deg,#2a1f12,#171009);border:2px solid var(--rc);border-radius:22px;padding:22px 40px;text-align:center;position:relative;overflow:hidden;animation:dpop .5s cubic-bezier(.2,1.6,.4,1)}
-@keyframes dpop{from{transform:scale(.5);opacity:0}}
-#disc-card .shine{position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,#ffffff33 50%,transparent 70%);animation:shine 1.6s infinite}
-@keyframes shine{from{transform:translateX(-120%)}to{transform:translateX(120%)}}
-#disc-icon{font-size:56px;filter:drop-shadow(0 0 14px currentColor)}
-#disc-rarity{font-size:12px;font-weight:900;letter-spacing:2px}
-#disc-name{font-size:22px;font-weight:900;margin:4px 0}
-#disc-desc{font-size:12px;color:var(--dim)}
+#disc-card{background:linear-gradient(160deg,#2a1f12,#171009);border:2px solid var(--rc);border-radius:22px;padding:20px 36px;text-align:center;position:relative;overflow:hidden}
+#disc-icon{font-size:50px}
+#disc-rarity{font-size:11px;font-weight:900;letter-spacing:1px}
+#disc-name{font-size:20px;font-weight:900;margin:4px 0}
+#disc-desc{font-size:11px;color:var(--dim)}
 
-/* ---------- النوافذ ---------- */
-#modal-root{position:absolute;inset:0;z-index:10;display:none}
+#modal-root{position:absolute;inset:0;z-index:15;display:none}
 #modal-root.on{display:block}
 #backdrop{position:absolute;inset:0;background:#0009}
-.sheet{position:absolute;right:0;left:0;bottom:0;top:auto;max-height:82vh;background:var(--panel2);border-top:2px solid var(--amber);border-radius:22px 22px 0 0;display:flex;flex-direction:column;animation:sheetUp .28s cubic-bezier(.2,1,.3,1);backdrop-filter:blur(12px);padding-bottom:var(--sab)}
+.sheet{position:absolute;right:0;left:0;bottom:0;top:auto;max-height:85vh;background:var(--panel2);border-top:2px solid var(--amber);border-radius:22px 22px 0 0;display:flex;flex-direction:column;animation:sheetUp .28s cubic-bezier(.2,1,.3,1);backdrop-filter:blur(14px);padding-bottom:var(--sab)}
 @keyframes sheetUp{from{transform:translateY(100%)}}
 .sheet-h{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--line)}
-.sheet-h h2{font-size:17px;color:var(--amber)}
+.sheet-h h2{font-size:16px;color:var(--amber)}
 .x-btn{width:36px;height:36px;border-radius:12px;background:#ffffff12;font-size:16px}
 .sheet-b{overflow-y:auto;padding:12px 14px;-webkit-overflow-scrolling:touch}
 .tabs{display:flex;gap:8px;padding:10px 14px 0}
-.tab{flex:1;padding:8px;border-radius:12px;background:#ffffff0d;font-weight:700;font-size:13px;border:1px solid transparent}
+.tab{flex:1;padding:8px;border-radius:12px;background:#ffffff0d;font-weight:700;font-size:12px;border:1px solid transparent}
 .tab.on{background:#ffb52e22;border-color:var(--amber);color:var(--amber)}
-.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
-.slot{aspect-ratio:1;background:#ffffff0a;border:2px solid #ffffff14;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;font-size:24px}
-.slot .q{position:absolute;bottom:2px;left:5px;font-size:10px;font-weight:900;color:#fff;text-shadow:0 1px 2px #000}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.slot{aspect-ratio:1;background:#ffffff0a;border:2px solid #ffffff14;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;font-size:22px}
+.slot .q{position:absolute;bottom:2px;left:5px;font-size:10px;font-weight:900;color:#fff}
 .slot.empty{opacity:.35;font-size:14px}
-.row{display:flex;align-items:center;gap:10px;background:#ffffff08;border:1px solid #ffffff12;border-radius:14px;padding:9px 12px;margin-bottom:8px}
-.row .ic{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;border:2px solid var(--rc)}
+.row{display:flex;align-items:center;gap:10px;background:#ffffff08;border:1px solid #ffffff12;border-radius:14px;padding:8px 12px;margin-bottom:8px}
+.row .ic{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;border:2px solid var(--rc)}
 .row .info{flex:1;min-width:0}
-.row .nm{font-weight:900;font-size:13px}
-.row .ds{font-size:11px;color:var(--dim);line-height:1.35}
-.row .st{font-size:10.5px;color:#8fd0ff;margin-top:2px}
-.btn{border-radius:12px;padding:8px 14px;font-weight:900;font-size:12px;background:linear-gradient(160deg,#ffb52e,#ff8c1a);color:#3a2405;white-space:nowrap}
+.row .nm{font-weight:900;font-size:12px}
+.row .ds{font-size:11px;color:var(--dim)}
+.row .st{font-size:10px;color:#8fd0ff;margin-top:2px}
+.btn{border-radius:10px;padding:6px 12px;font-weight:900;font-size:11px;background:linear-gradient(160deg,#ffb52e,#ff8c1a);color:#3a2405;white-space:nowrap}
 .btn:active{transform:scale(.95)}
 .btn.alt{background:#ffffff14;color:var(--txt)}
 .btn.grn{background:linear-gradient(160deg,#8ee06a,#4caf50);color:#0d2a08}
 .btn:disabled{opacity:.4;transform:none}
-.pbar{height:8px;background:#0007;border-radius:5px;overflow:hidden;margin-top:5px}
-.pbar i{display:block;height:100%;background:linear-gradient(90deg,var(--amber),#ffd76a);border-radius:5px}
-#weight-bar{height:9px;background:#0007;border-radius:5px;overflow:hidden;margin:4px 14px 10px}
+.pbar{height:6px;background:#0007;border-radius:4px;overflow:hidden;margin-top:4px}
+.pbar i{display:block;height:100%;background:linear-gradient(90deg,var(--amber),#ffd76a)}
+#weight-bar{height:7px;background:#0007;border-radius:4px;overflow:hidden;margin:4px 14px 8px}
 #weight-fill{height:100%;background:linear-gradient(90deg,#8ee06a,#ffd76a);width:0%}
 .wlabel{font-size:11px;color:var(--dim);padding:0 16px}
-.set-row{display:flex;align-items:center;justify-content:space-between;padding:10px 4px;border-bottom:1px solid #ffffff0d;font-size:13px;font-weight:700;gap:10px}
+.set-row{display:flex;align-items:center;justify-content:space-between;padding:8px 4px;border-bottom:1px solid #ffffff0d;font-size:12px;font-weight:700;gap:8px}
 .set-row input[type=range]{flex:1;accent-color:var(--amber)}
-.set-row select{background:#2a1f12;color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-family:inherit}
-.toggle{min-width:74px;padding:7px;border-radius:12px;background:#ffffff12;font-weight:900;font-size:12px;text-align:center}
+.set-row select{background:#2a1f12;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-family:inherit}
+.toggle{min-width:70px;padding:6px;border-radius:10px;background:#ffffff12;font-weight:900;font-size:11px;text-align:center}
 .toggle.on{background:#8ee06a33;color:#8ee06a;border:1px solid #8ee06a}
-.detail-pop{position:absolute;inset:0;background:#171009f2;border-radius:22px 22px 0 0;padding:18px;display:flex;flex-direction:column;gap:10px;z-index:2;animation:sheetUp .22s}
-#loading{position:fixed;inset:0;z-index:50;background:radial-gradient(120% 100% at 50% 20%,#3a2a12,#120c06);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
-#logo{width:150px;height:150px;border-radius:34px;box-shadow:0 10px 40px #000a,0 0 0 3px #ffb52e55}
-#loading h1{font-size:34px;font-weight:900;letter-spacing:4px;color:var(--amber);text-shadow:0 3px 0 #7a4a00}
-#load-tip{font-size:12px;color:var(--dim);max-width:70vw;text-align:center}
-#load-bar{width:200px;height:7px;background:#ffffff14;border-radius:5px;overflow:hidden}
+
+#loading{position:fixed;inset:0;z-index:50;background:radial-gradient(120% 100% at 50% 20%,#3a2a12,#120c06);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+#logo{width:130px;height:130px;border-radius:28px;box-shadow:0 10px 40px #000a,0 0 0 3px #ffb52e55}
+#loading h1{font-size:30px;font-weight:900;letter-spacing:3px;color:var(--amber)}
+#load-tip{font-size:12px;color:var(--dim);max-width:75vw;text-align:center}
+#load-bar{width:180px;height:6px;background:#ffffff14;border-radius:4px;overflow:hidden}
 #load-fill{height:100%;width:5%;background:linear-gradient(90deg,var(--amber),#ffd76a);transition:width .3s}
 #rotate-hint{display:none;position:fixed;inset:0;z-index:60;background:#120c06f0;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-weight:900;text-align:center;padding:20px}
-#rotate-hint .ph{font-size:52px;animation:rot 1.6s infinite}
-@keyframes rot{0%,20%{transform:rotate(0)}60%,100%{transform:rotate(90deg)}}
+#rotate-hint .ph{font-size:52px}
 @media (orientation:portrait) and (pointer:coarse){ #rotate-hint{display:flex} }
 #fps-tag{position:absolute;bottom:calc(4px + var(--sab));left:calc(8px + var(--sal));z-index:4;font-size:10px;color:#ffffff55;pointer-events:none}
 </style>
 </head>
 <body>
 <div id="app"></div>
-<div id="touch-layer"></div>
+
+<!-- طبقات اللمس المخصصة -->
+<div id="controls-layer">
+  <!-- منطقة حركة الكاميرا (النصف الأيمن) -->
+  <div id="touch-look-zone"></div>
+  <!-- منطقة المشي وعصا التحكم (النصف الأيسر) -->
+  <div id="touch-move-zone"></div>
+</div>
+
+<!-- عصا التحكم الافتراضية الثابتة -->
+<div id="joy-container">
+  <div id="joy-knob"></div>
+</div>
+
+<!-- أزرار الإجراء والقفز والجري -->
+<div id="btn-cluster">
+  <div class="cbtn-col">
+    <button class="cbtn" id="btn-jump">⤴<small>قفز</small></button>
+    <button class="cbtn" id="btn-sprint">🏃<small>جري</small></button>
+  </div>
+  <button id="btn-action">⛏<small>إزالة</small></button>
+</div>
 
 <!-- HUD -->
 <div id="hud">
@@ -166,7 +186,7 @@ button{font-family:inherit;color:inherit;border:none;background:none;cursor:poin
       <button class="menu-btn" id="btn-inv" title="الحقيبة">🎒</button>
       <button class="menu-btn" id="btn-mis" title="المهام">📜<i class="badge" id="mis-badge"></i></button>
       <button class="menu-btn" id="btn-set" title="الإعدادات">⚙️</button>
-      <button class="menu-btn" id="btn-install" title="تثبيت اللعبة">📲</button>
+      <button class="menu-btn" id="btn-install" title="تثبيت التطبيق">📲</button>
     </div>
     <div id="stat-group">
       <div class="chip" id="tool-chip">🛠 <b id="tool-name">اليدان</b></div>
@@ -180,16 +200,6 @@ button{font-family:inherit;color:inherit;border:none;background:none;cursor:poin
 </div>
 <div id="fps-tag"></div>
 
-<!-- controls -->
-<div id="joy-zone"><div id="joy-base"><div id="joy-knob"></div></div></div>
-<div id="btn-cluster">
-  <button class="cbtn" id="btn-sprint">🏃<small>جري</small></button>
-  <button class="cbtn" id="btn-jump">⤴<small>قفز</small></button>
-  <button class="cbtn" id="btn-crouch">🧎<small>انحناء</small></button>
-  <button class="cbtn" id="btn-punch">👀<small>نظر</small></button>
-</div>
-<button id="btn-action">⛏<small>إزالة</small></button>
-
 <div id="tut-bar" class="hide">
   <div id="tut-dots"></div>
   <div id="tut-text"></div>
@@ -197,20 +207,23 @@ button{font-family:inherit;color:inherit;border:none;background:none;cursor:poin
 </div>
 <div id="toasts"></div>
 
-<div id="discovery"><div id="disc-card"><div class="shine"></div><div id="disc-icon">🪡</div><div id="disc-rarity"></div><div id="disc-name"></div><div id="disc-desc"></div></div></div>
+<div id="discovery"><div id="disc-card"><div id="disc-icon">🪡</div><div id="disc-rarity"></div><div id="disc-name"></div><div id="disc-desc"></div></div></div>
 
-<!-- modals -->
-<div id="modal-root"><div id="backdrop"></div>
-  <div class="sheet" id="sheet"><div class="sheet-h"><h2 id="sheet-title"></h2><button class="x-btn" id="sheet-close">✕</button></div><div class="sheet-b" id="sheet-body"></div></div>
+<div id="modal-root">
+  <div id="backdrop"></div>
+  <div class="sheet" id="sheet">
+    <div class="sheet-h"><h2 id="sheet-title"></h2><button class="x-btn" id="sheet-close">✕</button></div>
+    <div class="sheet-b" id="sheet-body"></div>
+  </div>
 </div>
 
-<div id="rotate-hint"><div class="ph">📱</div><div>يُفضَّل اللعب بالوضع الأفقي (Landscape)<br>أدر هاتفك للعودة</div></div>
+<div id="rotate-hint"><div class="ph">📱</div><div>يُفضَّل اللعب بالوضع الأفقي (Landscape)<br>أدر هاتفك للاستمتاع</div></div>
 
 <div id="loading">
-  <canvas id="logo" width="300" height="300"></canvas>
+  <canvas id="logo" width="260" height="260"></canvas>
   <h1>HAYSTACK</h1>
   <div id="load-bar"><div id="load-fill"></div></div>
-  <div id="load-tip">جارٍ تحميل المزرعة…</div>
+  <div id="load-tip">جارٍ تهيئة المزرعة ونظام التحكم…</div>
 </div>
 
 <script async src="https://ga.jspm.io/npm:es-module-shims@1.8.3/dist/es-module-shims.js"></script>
@@ -240,7 +253,7 @@ if (installBtn) {
       if (outcome === 'accepted') installBtn.style.display = 'none';
       deferredPrompt = null;
     } else {
-      UI.toast('لتثبيت التطبيق: افتح خيارات المتصفح واضغط "إضافة إلى الشاشة الرئيسية"');
+      UI.toast('لتثبيت اللعبة: اضغط على زر المشاركة ثم "إضافة إلى الشاشة الرئيسية"');
     }
   });
 }
@@ -310,7 +323,7 @@ const SaveSys={db:null,ok:false,
 let S=null;
 function freshState(){return{v:1,money:15,xp:0,inv:{hay:0},tools:{hands:{lvl:0}},equipped:'hands',bagCap:30,bagLvl:0,
  missions:{},stats:{hayRemoved:0,needles:0,earned:0,soldValue:0,toolsBought:0,upgrades:0,found:{},sold:{}},
- piles:{},settings:{sens:1.2,fov:75,quality:'med',audio:true,invert:false},tut:0,pity:0,ts:Date.now()}}
+ piles:{},settings:{sens:1.3,fov:75,quality:'med',audio:true,invert:false},tut:0,pity:0,ts:Date.now()}}
 function xpNeed(l){return Math.round(80*Math.pow(l,1.45))}
 function levelOf(xp){let l=1,need=xpNeed(1);while(xp>=need){xp-=need;l++;need=xpNeed(l)}return{l,left:xp,need}}
 function effTool(){const id=S.equipped,t=TOOLS[id],lvl=(S.tools[id]||{}).lvl||0;
@@ -430,15 +443,13 @@ function signTex(text,bg='#7a4a22',fg='#ffe9bd'){const c=document.createElement(
  g.fillStyle=fg;g.font='900 84px Cairo, sans-serif';g.textAlign='center';g.textBaseline='middle';g.direction='rtl';
  g.fillText(text,256,96);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return t}
 function drawLogo(){const c=$('logo'),g=c.getContext('2d');
- g.fillStyle='#2a1c0c';g.fillRect(0,0,300,300);
- const grd=g.createRadialGradient(150,120,10,150,150,190);grd.addColorStop(0,'#5a4018');grd.addColorStop(1,'#1c1208');
- g.fillStyle=grd;g.fillRect(0,0,300,300);
- g.fillStyle='#e8b93f';g.beginPath();g.moveTo(150,52);g.bezierCurveTo(70,110,60,200,60,225);g.lineTo(240,225);
- g.bezierCurveTo(240,200,230,110,150,52);g.fill();
- g.strokeStyle='#a87f22';g.lineWidth=3;for(let i=0;i<10;i++){g.beginPath();g.moveTo(70+i*17,225);g.quadraticCurveTo(90+i*14,140,150,58);g.stroke()}
- g.save();g.translate(196,96);g.rotate(.7);g.fillStyle='#f4f6f8';g.fillRect(-3,-34,6,68);
- g.beginPath();g.arc(0,-34,7,0,Math.PI,true);g.fill();g.restore();
- g.strokeStyle='#fff2';g.lineWidth=2;g.beginPath();g.arc(196,96,26,0,7);g.stroke();}
+ g.fillStyle='#2a1c0c';g.fillRect(0,0,260,260);
+ const grd=g.createRadialGradient(130,110,10,130,130,160);grd.addColorStop(0,'#5a4018');grd.addColorStop(1,'#1c1208');
+ g.fillStyle=grd;g.fillRect(0,0,260,260);
+ g.fillStyle='#e8b93f';g.beginPath();g.moveTo(130,42);g.bezierCurveTo(60,95,50,170,50,195);g.lineTo(210,195);
+ g.bezierCurveTo(210,170,200,95,130,42);g.fill();
+ g.save();g.translate(170,85);g.rotate(.7);g.fillStyle='#f4f6f8';g.fillRect(-3,-30,6,60);
+ g.beginPath();g.arc(0,-30,6,0,Math.PI,true);g.fill();g.restore();}
 
 /* ================= [WORLD] ================= */
 const Colliders=[];
@@ -472,12 +483,6 @@ function buildWorld(){
  for(let z=rect.z0;z<=rect.z1;z+=step){posts.push([rect.x0,z,0]);posts.push([rect.x1,z,0])}
  const pm=new THREE.InstancedMesh(postGeo,woodMat,posts.length);const M=new THREE.Matrix4();
  posts.forEach((p,i)=>{M.makeTranslation(p[0],.75,p[1]);pm.setMatrixAt(i,M)});pm.castShadow=true;scene.add(pm);
- const railsList=[];
- for(let x=rect.x0;x<rect.x1;x+=step){railsList.push([x+step/2,rect.z0,0]);railsList.push([x+step/2,rect.z1,0])}
- for(let z=rect.z0;z<rect.z1;z+=step){railsList.push([rect.x0,z+step/2,1]);railsList.push([rect.x1,z+step/2,1])}
- const rm=new THREE.InstancedMesh(railGeo,woodMat,railsList.length*2);const Q=new THREE.Quaternion(),E=new THREE.Euler(),SC=new THREE.Vector3(1,1,1),P=new THREE.Vector3();
- let ri=0;[.5,1.05].forEach(h=>{railsList.forEach(r=>{E.set(0,r[2]?Math.PI/2:0,0);Q.setFromEuler(E);P.set(r[0],h,r[1]);M.compose(P,Q,SC);rm.setMatrixAt(ri++,M)})});
- rm.castShadow=true;scene.add(rm);
 
  const trunkGeo=new THREE.CylinderGeometry(.22,.32,2.4,6),leafGeo=new THREE.ConeGeometry(2,4.2,7);
  const trunkMat=new THREE.MeshStandardMaterial({color:0x6e4a2a,roughness:1}),leafMat=new THREE.MeshStandardMaterial({color:0x4a7c38,roughness:1});
@@ -492,9 +497,9 @@ function buildWorld(){
  const barnMat=new THREE.MeshStandardMaterial({map:TX.wood,color:0xc0563d,roughness:.9});
  makeMesh(new THREE.BoxGeometry(11,6,8),barnMat,-22,3,-10,.35);
  const roofMat=new THREE.MeshStandardMaterial({map:TX.roof,roughness:1});
- const r1=makeMesh(new THREE.BoxGeometry(11.8,.3,5.2),roofMat,-22,7.1,-10,.35);r1.rotation.z=.62;
+ const r1=makeMesh(new THREE.BoxGeometry(11.8,.3,5.2),roofMat,-22,7.1,-10,.35);r1.rotation.z=.62;r1.position.y=6.9;
  const r2=makeMesh(new THREE.BoxGeometry(11.8,.3,5.2),roofMat,-22,7.1,-10,.35);r2.rotation.z=-.62;r2.position.y=7.9;
- r1.position.y=6.9;addCol(-22,-10,7.5);
+ addCol(-22,-10,7.5);
 
  const wsMat=new THREE.MeshStandardMaterial({map:TX.wood,color:0x8a8a92,roughness:.95});
  makeMesh(new THREE.BoxGeometry(6,4,5),wsMat,-18,2,15,-.3);
@@ -509,15 +514,9 @@ function buildWorld(){
  makeMesh(new THREE.BoxGeometry(4.4,.35,4.4),new THREE.MeshStandardMaterial({map:TX.wood,color:0xc9a05e}),8,.175,14);
  makeMesh(new THREE.BoxGeometry(.9,.5,.9),new THREE.MeshStandardMaterial({color:0x555c66,metalness:.5,roughness:.5}),8,.6,14);
 
- const crateMat=new THREE.MeshStandardMaterial({map:TX.wood,color:0xb08850});
- [[-16,-3,.5],[-15.2,-3.8,.42],[-16.4,-4.2,.36],[12,18,.4],[13,17.4,.5]].forEach(c=>{makeMesh(new THREE.BoxGeometry(c[2]*2,c[2]*2,c[2]*2),crateMat,c[0],c[2],c[1],rnd(0,1));addCol(c[0],c[1],c[2]+.2)});
- const barMat=new THREE.MeshStandardMaterial({color:0x7a4a28,roughness:.9});
- [[-13.5,-6],[11.5,17.8],[-25,3]].forEach(b=>{makeMesh(new THREE.CylinderGeometry(.42,.42,1.1,10),barMat,b[0],.55,b[1]);addCol(b[0],b[1],.6)});
-
  const mkSign=(txt,x,z,ry,bg)=>{const tex=signTex(txt,bg);const m=new THREE.Mesh(new THREE.PlaneGeometry(2.8,.98),new THREE.MeshBasicMaterial({map:tex}));
   m.position.set(x,2.5,z);m.rotation.y=ry;scene.add(m);makeMesh(new THREE.BoxGeometry(.12,2.5,.12),woodMat,x,1.25,z)};
  mkSign('المتجر',18,-4.2,0,'#28527a');mkSign('منصة البيع',8,16.4,Math.PI,'#2e6b3a');mkSign('الحظيرة',-22,-5,.35);
- mkSign('الورشة',-18,12.2,-.3+Math.PI,'#555');mkSign('منطقة الآلات',15,-14,0,'#4a3a5a');
 
  ZONES.forEach(z=>{const col=z.id==='sell'?0x37d67a:0x3fa9ff;
   const ring=new THREE.Mesh(new THREE.RingGeometry(z.r-.25,z.r,40),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.5,side:THREE.DoubleSide}));
@@ -658,55 +657,164 @@ function gainXP(n){const before=levelOf(S.xp).l;S.xp+=n;const after=levelOf(S.xp
  Bus.emit('xp');scheduleSave()}
 function addMoney(n,fromSell){S.money+=n;if(fromSell)S.stats.earned+=n;Bus.emit('money');scheduleSave()}
 
-/* ================= [PLAYER] + [INPUT] ================= */
-const Player={pos:new THREE.Vector3(0,0,20),vy:0,yaw:0,pitch:0,grounded:true,crouch:false,sprintHeld:false,
- stamina:100,bobT:0,stepT:0,shakeAmp:0,pitchKick:0,fov:75,moveDist:0,lookDist:0,
- eye(){return this.crouch?.95:1.62},shake(a){this.shakeAmp=Math.max(this.shakeAmp,a)}};
-const Input={joy:{x:0,y:0,id:null},keys:{},actionHeld:false,sprint:false,lookId:null,lastX:0,lastY:0};
+/* ================= [PLAYER] + [IMPROVED DUAL-TOUCH CONTROLS] ================= */
+const Player={pos:new THREE.Vector3(0,0,20),vy:0,yaw:0,pitch:0,targetYaw:0,targetPitch:0,
+ grounded:true,crouch:false,sprintHeld:false,stamina:100,bobT:0,stepT:0,shakeAmp:0,pitchKick:0,
+ fov:75,moveDist:0,lookDist:0,eye(){return this.crouch?.95:1.62},shake(a){this.shakeAmp=Math.max(this.shakeAmp,a)}};
+
+const Input={
+ joy:{x:0,y:0,id:null,originX:0,originY:0},
+ look:{id:null,lastX:0,lastY:0},
+ keys:{},actionHeld:false,sprint:false
+};
+
 function initInput(){
- const jz=$('joy-zone'),base=$('joy-base'),knob=$('joy-knob');
- jz.addEventListener('pointerdown',e=>{AudioSys.ensure();if(Input.joy.id!==null)return;Input.joy.id=e.pointerId;
-  jz.setPointerCapture(e.pointerId);base.style.display='block';base.style.left=e.clientX+'px';base.style.top=e.clientY+'px';
-  knob.style.left=e.clientX+'px';knob.style.top=e.clientY+'px';base._ox=e.clientX;base._oy=e.clientY});
- jz.addEventListener('pointermove',e=>{if(e.pointerId!==Input.joy.id)return;
-  let dx=e.clientX-base._ox,dy=e.clientY-base._oy;const d=Math.hypot(dx,dy),max=52;
-  if(d>max){dx=dx/d*max;dy=dy/d*max}knob.style.left=(base._ox+dx)+'px';knob.style.top=(base._oy+dy)+'px';
-  Input.joy.x=dx/max;Input.joy.y=-dy/max});
- const joyEnd=e=>{if(e.pointerId!==Input.joy.id)return;Input.joy.id=null;Input.joy.x=Input.joy.y=0;base.style.display='none'};
- jz.addEventListener('pointerup',joyEnd);jz.addEventListener('pointercancel',joyEnd);
+  const moveZone = $('touch-move-zone');
+  const lookZone = $('touch-look-zone');
+  const knob = $('joy-knob');
+  const joyContainer = $('joy-container');
 
- const layer=$('touch-layer');
- layer.addEventListener('touchstart',e=>{AudioSys.ensure();for(const t of e.changedTouches){if(Input.lookId===null){Input.lookId=t.identifier;Input.lastX=t.clientX;Input.lastY=t.clientY}}e.preventDefault()},{passive:false});
- layer.addEventListener('touchmove',e=>{for(const t of e.changedTouches){if(t.identifier!==Input.lookId)continue;
-  const dx=t.clientX-Input.lastX,dy=t.clientY-Input.lastY;Input.lastX=t.clientX;Input.lastY=t.clientY;
-  lookBy(dx,dy);Player.lookDist+=Math.abs(dx)+Math.abs(dy)}e.preventDefault()},{passive:false});
- const lookEnd=e=>{for(const t of e.changedTouches)if(t.identifier===Input.lookId)Input.lookId=null};
- layer.addEventListener('touchend',lookEnd);layer.addEventListener('touchcancel',lookEnd);
+  // 1. نظام حركة الإبهام الأيسر (Joystick)
+  moveZone.addEventListener('touchstart', (e) => {
+    AudioSys.ensure();
+    if (Input.joy.id !== null) return;
+    const t = e.changedTouches[0];
+    Input.joy.id = t.identifier;
+    const rect = joyContainer.getBoundingClientRect();
+    Input.joy.originX = rect.left + rect.width / 2;
+    Input.joy.originY = rect.top + rect.height / 2;
+    handleJoyMove(t.clientX, t.clientY);
+  }, { passive: false });
 
- const cv=renderer.domElement;
- cv.addEventListener('click',()=>{AudioSys.ensure();if(matchMedia('(pointer:fine)').matches&&!document.pointerLockElement)cv.requestPointerLock()});
- document.addEventListener('mousemove',e=>{if(document.pointerLockElement===cv)lookBy(e.movementX,e.movementY)});
- addEventListener('keydown',e=>{Input.keys[e.code]=true;AudioSys.ensure();
-  if(e.code==='KeyE')doInteract();if(e.code==='KeyI')Modals.open('inv');if(e.code==='Escape')Modals.close()});
- addEventListener('keyup',e=>Input.keys[e.code]=false);
+  moveZone.addEventListener('touchmove', (e) => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const t = e.changedTouches[i];
+      if (t.identifier === Input.joy.id) {
+        handleJoyMove(t.clientX, t.clientY);
+        break;
+      }
+    }
+  }, { passive: false });
 
- const bind=(id,down,up)=>{const b=$(id);const pd=e=>{e.preventDefault();AudioSys.ensure();b.classList.add('active');down&&down()};
-  const pu=e=>{e.preventDefault();b.classList.remove('active');up&&up()};
-  b.addEventListener('pointerdown',pd);b.addEventListener('pointerup',pu);b.addEventListener('pointercancel',pu);b.addEventListener('pointerleave',pu)};
- bind('btn-jump',()=>{if(Player.grounded){Player.vy=7.6;Player.grounded=false;AudioSys.noise(AudioSys.ctx?AudioSys.ctx.currentTime:0,.1,.05,'lowpass',500)}});
- bind('btn-sprint',()=>Input.sprint=true,()=>Input.sprint=false);
- bind('btn-crouch',()=>{Player.crouch=!Player.crouch;$('btn-crouch').classList.toggle('active',Player.crouch)});
- bind('btn-action',()=>{Input.actionHeld=true;doInteract()},()=>Input.actionHeld=false);
- $('btn-inv').onclick=()=>{AudioSys.ensure();Modals.open('inv')};
- $('btn-set').onclick=()=>{AudioSys.ensure();Modals.open('set')};
- $('btn-mis').onclick=()=>{AudioSys.ensure();Modals.open('mis')};
- document.addEventListener('contextmenu',e=>e.preventDefault());
- document.addEventListener('pointerdown',()=>AudioSys.ensure(),{once:false});
- addEventListener('pagehide',()=>saveNow());
-}
-function lookBy(dx,dy){
- Player.yaw-=dx*.0036*S.settings.sens;
- Player.pitch=clamp(Player.pitch+(S.settings.invert?1:-1)*dy*.0036*S.settings.sens,-1.35,1.35);
+  const releaseJoy = (e) => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === Input.joy.id) {
+        Input.joy.id = null;
+        Input.joy.x = 0;
+        Input.joy.y = 0;
+        knob.style.transform = `translate(0px, 0px)`;
+        break;
+      }
+    }
+  };
+  moveZone.addEventListener('touchend', releaseJoy);
+  moveZone.addEventListener('touchcancel', releaseJoy);
+
+  function handleJoyMove(cx, cy) {
+    const dx = cx - Input.joy.originX;
+    const dy = cy - Input.joy.originY;
+    const dist = Math.hypot(dx, dy);
+    const maxRadius = 42;
+    const clampedDist = Math.min(dist, maxRadius);
+    const angle = Math.atan2(dy, dx);
+
+    const nx = Math.cos(angle) * clampedDist;
+    const ny = Math.sin(angle) * clampedDist;
+    knob.style.transform = `translate(${nx}px, ${ny}px)`;
+
+    // Deadzone خفيفة لمنع الانجراف
+    if (dist < 4) {
+      Input.joy.x = 0;
+      Input.joy.y = 0;
+    } else {
+      Input.joy.x = nx / maxRadius;
+      Input.joy.y = -ny / maxRadius;
+    }
+  }
+
+  // 2. نظام تدوير الكاميرا الأيمن مع تنعيم فائق
+  lookZone.addEventListener('touchstart', (e) => {
+    AudioSys.ensure();
+    if (Input.look.id !== null) return;
+    const t = e.changedTouches[0];
+    Input.look.id = t.identifier;
+    Input.look.lastX = t.clientX;
+    Input.look.lastY = t.clientY;
+  }, { passive: false });
+
+  lookZone.addEventListener('touchmove', (e) => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const t = e.changedTouches[i];
+      if (t.identifier === Input.look.id) {
+        const dx = t.clientX - Input.look.lastX;
+        const dy = t.clientY - Input.look.lastY;
+        Input.look.lastX = t.clientX;
+        Input.look.lastY = t.clientY;
+
+        // حساسية سلسة للكاميرا
+        const sens = 0.0032 * S.settings.sens;
+        Player.targetYaw -= dx * sens;
+        Player.targetPitch = clamp(Player.targetPitch + (S.settings.invert ? 1 : -1) * dy * sens, -1.35, 1.35);
+        Player.lookDist += Math.abs(dx) + Math.abs(dy);
+        break;
+      }
+    }
+  }, { passive: false });
+
+  const releaseLook = (e) => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === Input.look.id) {
+        Input.look.id = null;
+        break;
+      }
+    }
+  };
+  lookZone.addEventListener('touchend', releaseLook);
+  lookZone.addEventListener('touchcancel', releaseLook);
+
+  // 3. أزرار العمل والحركة
+  const bind = (id, down, up) => {
+    const b = $(id);
+    b.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      AudioSys.ensure();
+      b.classList.add('active');
+      down && down();
+    }, { passive: false });
+    const end = (e) => {
+      e.preventDefault();
+      b.classList.remove('active');
+      up && up();
+    };
+    b.addEventListener('touchend', end);
+    b.addEventListener('touchcancel', end);
+  };
+
+  bind('btn-jump', () => {
+    if (Player.grounded) {
+      Player.vy = 7.6;
+      Player.grounded = false;
+      AudioSys.noise(AudioSys.ctx ? AudioSys.ctx.currentTime : 0, .1, .05, 'lowpass', 500);
+    }
+  });
+  bind('btn-sprint', () => Input.sprint = true, () => Input.sprint = false);
+  bind('btn-action', () => { Input.actionHeld = true; doInteract(); }, () => Input.actionHeld = false);
+
+  $('btn-inv').onclick = () => { AudioSys.ensure(); Modals.open('inv'); };
+  $('btn-set').onclick = () => { AudioSys.ensure(); Modals.open('set'); };
+  $('btn-mis').onclick = () => { AudioSys.ensure(); Modals.open('mis'); };
+
+  // خيار لوحة المفاتيح والماوس للكمبيوتر
+  addEventListener('keydown', e => {
+    Input.keys[e.code] = true;
+    AudioSys.ensure();
+    if (e.code === 'Space' && Player.grounded) { Player.vy = 7.6; Player.grounded = false; }
+    if (e.code === 'KeyE') doInteract();
+  });
+  addEventListener('keyup', e => Input.keys[e.code] = false);
+
+  document.addEventListener('contextmenu', e => e.preventDefault());
+  addEventListener('pagehide', () => saveNow());
 }
 
 /* ================= tool view (hands + tools) ================= */
@@ -813,9 +921,9 @@ function misBadge(){let any=false;for(const m of MISSIONS){const st=S.missions[m
 /* ================= [TUTORIAL] ================= */
 const TUT=[
  'مرحبًا بك في HAYSTACK 🌾 استخدم عصا التحكم اليسرى للمشي',
- 'اسحب بإصبعك على الشاشة للنظر حولك 👀',
+ 'اسحب بإصبعك على الجهة اليمنى للنظر بسلاسة 👀',
  'اقترب من كومة القش القريبة منك',
- 'اضغط زر ⛏ الذهبي (أو استمر بالضغط) لإزالة القش',
+ 'اضغط زر ⛏ الذهبي لإزالة القش',
  'هناك إبرة مفقودة داخل هذا القش… واصل البحث حتى تجدها 🪡',
  'رائع! الآن بِع القش في منصة البيع الخضراء 💰',
  'أخيرًا: اشترِ أداتك الأولى من المتجر الأزرق 🛒',
@@ -828,7 +936,7 @@ function tutUpdate(dt){if(!S||S.tut>=TUT.length){$('tut-bar').classList.add('hid
  let done=false;
  switch(S.tut){
   case 0:tutAcc+=Math.hypot(Input.joy.x,Input.joy.y)*dt;if(tutAcc>1.5)done=true;break;
-  case 1:if(Player.lookDist>160)done=true;break;
+  case 1:if(Player.lookDist>120)done=true;break;
   case 2:if(Hay.piles.some(p=>Math.hypot(Player.pos.x-p.def.x,Player.pos.z-p.def.z)<p.def.R+2.5))done=true;break;
   case 3:if(S.stats.hayRemoved>=1)done=true;break;
   case 4:if(S.stats.needles>=1)done=true;break;
@@ -968,21 +1076,27 @@ const Modals={cur:null,
   const tutB=this.btn('🔁 إعادة الدرس التعليمي','alt',()=>{S.tut=0;tutAcc=0;Player.lookDist=0;this.close();scheduleSave()});
   const resetB=this.btn('🗑 مسح الحفظ والبدء من جديد','alt',()=>{if(confirm('سيتم مسح كل تقدمك نهائيًا. هل أنت متأكد؟')){SaveSys.del('save');location.reload()}});
   const about=document.createElement('div');about.style.cssText='font-size:11px;color:var(--dim);text-align:center;margin-top:14px';
-  about.innerHTML='HAYSTACK v0.1.0 — المرحلة الأولى ⛏<br>من البحث باليدين… إلى إمبراطورية القش.';
+  about.innerHTML='HAYSTACK v0.2.0 — نظام تحكم سلس ومحسّن ⛏';
   const col=document.createElement('div');col.style.cssText='display:flex;flex-direction:column;gap:8px;margin-top:10px';
   col.append(saveB,tutB,resetB);w.append(col,about);return w}};
 $('sheet-close').onclick=()=>Modals.close();$('backdrop').onclick=()=>Modals.close();
 
 /* ================= game loop ================= */
 let last=performance.now(),fpsAcc=0,fpsN=0,fpsT=0;
-const FWD=new THREE.Vector3(),RIGHT=new THREE.Vector3(),MOVE=new THREE.Vector3(),TMP=new THREE.Vector3();
+const FWD=new THREE.Vector3(),RIGHT=new THREE.Vector3(),MOVE=new THREE.Vector3();
 function update(dt){
- let mx=Input.joy.x,my=Input.joy.y;
+ // 1. تنعيم حركة الكاميرا (Smooth Damping)
+ Player.yaw = lerp(Player.yaw, Player.targetYaw, Math.min(1, dt * 18));
+ Player.pitch = lerp(Player.pitch, Player.targetPitch, Math.min(1, dt * 18));
+
+ // 2. حركة اللاعب
+ let mx = Input.joy.x, my = Input.joy.y;
  if(Input.keys.KeyW)my+=1;if(Input.keys.KeyS)my-=1;if(Input.keys.KeyA)mx-=1;if(Input.keys.KeyD)mx+=1;
  const k=Math.hypot(mx,my);if(k>1){mx/=k;my/=k}
- const moving=k>.08;
- const sprint=(Input.sprint||Input.keys.ShiftLeft)&&moving&&!Player.crouch&&Player.stamina>1;
- let spd=Player.crouch?1.7:(sprint?6.6:3.4);
+ const moving=k>.05;
+ const sprint=(Input.sprint||Input.keys.ShiftLeft)&&moving&&Player.stamina>1;
+ let spd=sprint?6.4:3.5;
+
  FWD.set(-Math.sin(Player.yaw),0,-Math.cos(Player.yaw));
  RIGHT.set(Math.cos(Player.yaw),0,-Math.sin(Player.yaw));
  MOVE.set(0,0,0).addScaledVector(FWD,my).addScaledVector(RIGHT,mx);
@@ -990,7 +1104,7 @@ function update(dt){
  Player.pos.addScaledVector(MOVE,spd*dt);
 
  if(sprint)Player.stamina=Math.max(0,Player.stamina-16*dt);
- else Player.stamina=Math.min(100,Player.stamina+(moving?9:14)*dt);
+ else Player.stamina=Math.min(100,Player.stamina+(moving?9:16)*dt);
  UI.stamina();
 
  Player.vy-=22*dt;let ny=Player.pos.y+Player.vy*dt;
@@ -1013,7 +1127,7 @@ function update(dt){
  camera.position.set(Player.pos.x+shx,Player.eye()+Player.pos.y+bobY+shy,Player.pos.z);
  camera.rotation.set(Player.pitch+Player.pitchKick,Player.yaw,0);
 
- const tfov=sprint?S.settings.fov+8:(Player.crouch?S.settings.fov-4:S.settings.fov);
+ const tfov=sprint?S.settings.fov+8:S.settings.fov;
  camera.fov=lerp(camera.fov,tfov,Math.min(1,dt*5));camera.updateProjectionMatrix();
 
  actionCd=Math.max(0,actionCd-dt);
@@ -1028,22 +1142,22 @@ function update(dt){
  tutUpdate(dt);misBadge();
 
  fpsN++;fpsT+=dt;if(fpsT>=1){$('fps-tag').textContent=Math.round(fpsN/fpsT)+' FPS';fpsN=0;fpsT=0}}
+
 function loop(now){requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/1000);last=now;
  update(dt);renderer.render(scene,camera)}
 
 /* ================= boot ================= */
-const TIPS=['الإبر الذهبية أثمن مما تظن…','المغناطيس يضاعف فرص العثور على المعادن','بِع القش بانتظام لتوسيع حقيبتك','الأدوات الأفضل = سعة أكبر لكل ضربة','الإبرة العتيقة أسطورة… أم حقيقة؟'];
 async function boot(){
- drawLogo();$('load-tip').textContent=TIPS[0];
+ drawLogo();
  await SaveSys.init();$('load-fill').style.width='25%';
  const raw=await SaveSys.get('save');
  S=Object.assign(freshState(),raw||{});
  S.settings=Object.assign(freshState().settings,raw?.settings||{});
  S.stats=Object.assign(freshState().stats,raw?.stats||{});
- if(raw){const f=freshState();S.inv=Object.assign({},raw.inv||{});S.tools=Object.assign({hands:{lvl:0}},raw.tools||{});
+ if(raw){S.inv=Object.assign({},raw.inv||{});S.tools=Object.assign({hands:{lvl:0}},raw.tools||{});
   S.missions=raw.missions||{};S.piles=raw.piles||{};if(!TOOLS[S.equipped])S.equipped='hands'}
  AudioSys.on=S.settings.audio;
- $('load-fill').style.width='40\%';$('load-tip').textContent='بناء المزرعة…';
+ $('load-fill').style.width='40%';
  makeTextures();initThree();scene.add(camera);
  const q=QUALITY[S.settings.quality];renderer.setPixelRatio(Math.min(devicePixelRatio,q.dpr));
  buildWorld();
@@ -1054,18 +1168,15 @@ async function boot(){
  Particles.init();Floaters.init();initReticle();Hands.build();
  initInput();UI.hud();UI.stamina();
  Player.fov=S.settings.fov;camera.fov=S.settings.fov;
- $('load-fill').style.width='80\%';$('load-tip').textContent='تشغيل الأنظمة…';
+ $('load-fill').style.width='80%';
  setInterval(()=>saveNow(),20000);
  setInterval(misBadge,1500);
- if(raw&&Date.now()-S.ts<1000*60*60*24*30)UI.toast('مرحبًا بعودتك! تم تحميل حفظك ✓','gold');
- else UI.toast('ابحث عن الإبرة في كومة القش! 🪡','gold');
+ if(raw&&Date.now()-S.ts<1000*60*60*24*30)UI.toast('تم تحميل حفظك بنجاح ✓','gold');
  $('load-fill').style.width='100%';
- setTimeout(()=>{$('loading').style.transition='opacity .5s';$('loading').style.opacity=0;
-  setTimeout(()=>$('loading').remove(),520)},350);
+ setTimeout(()=>{$('loading').style.transition='opacity .4s';$('loading').style.opacity=0;
+  setTimeout(()=>$('loading').remove(),420)},300);
  requestAnimationFrame(loop);
- console.log('%cHAYSTACK v0.1.0 — Stage 1 ready ⛏','color:#ffb52e;font-weight:bold;font-size:14px');
 }
-$('btn-punch').addEventListener('pointerdown',e=>{e.preventDefault();Player.pitch=0;AudioSys.ensure()});
 boot().catch(e=>{console.error(e);$('load-tip').textContent='خطأ في التحميل: '+e.message;$('load-tip').style.color='#ff6b6b'});
 </script>
 </body>
