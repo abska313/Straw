@@ -1,130 +1,2338 @@
-<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="theme-color" content="#0b2a1f"><meta name="apple-mobile-web-app-capable" content="yes">
-<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
-<title>إبرة في كومة قش</title>
-<style>
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
-html,body{margin:0;height:100%;overflow:hidden;background:#0b2a1f;color:#f3e3a0;font-family:system-ui,Tahoma,sans-serif;touch-action:none}
-canvas{position:fixed;inset:0}
-button{background:#d4af37;color:#0b2a1f;border:0;border-radius:10px;padding:10px 16px;font-size:16px;font-weight:800;font-family:inherit}
-button:disabled{opacity:.4}
-#top{position:fixed;z-index:5;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:calc(env(safe-area-inset-top,0px) + 8px) 14px 8px;background:#0b2a1fcc;font-weight:700}
-#st{position:fixed;z-index:5;left:24px;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);width:130px;height:130px;border-radius:50%;background:#d4af3722;border:2px solid #d4af37aa}
-#kn{position:absolute;left:35px;top:35px;width:60px;height:60px;border-radius:50%;background:#d4af37;pointer-events:none}
-#dg{position:fixed;z-index:5;right:28px;bottom:calc(env(safe-area-inset-bottom,0px) + 40px);width:96px;height:96px;border-radius:50%;font-size:20px;padding:0}
-#hb{position:fixed;z-index:5;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 170px);display:flex;justify-content:center;gap:8px;pointer-events:none}
-.s{width:52px;height:52px;border-radius:12px;background:#0b2a1fcc;border:2px solid #d4af3766;display:flex;align-items:center;justify-content:center;font-size:26px;pointer-events:auto}
-.s.on{border-color:#d4af37;background:#d4af3733}
-#pn{position:fixed;inset:0;z-index:9;background:#0b2a1ff5;display:none;overflow:auto;touch-action:pan-y;padding:calc(env(safe-area-inset-top,0px) + 14px) 16px 28px}
-#pn h2{color:#d4af37;margin:14px 0 8px}
-.g{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;margin-bottom:12px}
-.c{background:#ffffff14;border-radius:10px;padding:8px 2px;font-size:13px}
-.r{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:8px 0;line-height:1.5}
-#top{font-size:14px;gap:6px}
-#dt{position:fixed;z-index:5;top:calc(env(safe-area-inset-top,0px) + 54px);left:0;right:0;text-align:center;font-weight:700;pointer-events:none;text-shadow:0 1px 3px #000}
-.tb{display:flex;gap:6px;margin-bottom:10px}
-.tb button{flex:1;padding:10px 4px;font-size:14px;opacity:.5}
-.tb button.on{opacity:1}
-#ch{position:fixed;z-index:4;left:50%;top:50%;transform:translate(-50%,-50%);font-size:26px;color:#fff;opacity:.7;pointer-events:none}
-#ars{position:fixed;z-index:5;top:calc(env(safe-area-inset-top,0px) + 84px);left:0;right:0;display:flex;justify-content:center;gap:50px;font-size:30px;pointer-events:none}
-#ars span{display:inline-block;visibility:hidden}#ar{color:#ff5a4a}#ab{color:#ffd24a}
-.f{position:fixed;left:50%;top:38%;z-index:6;font-size:24px;font-weight:800;color:#fff3b0;text-shadow:0 2px 6px #000;pointer-events:none;animation:fl 1.6s forwards}
-@keyframes fl{from{transform:translate(-50%,0)}to{transform:translate(-50%,-70px);opacity:0}}
-</style></head><body>
-<canvas id="c"></canvas><div id="ch">+</div><div id="ars"><span id="ar">▲</span><span id="ab">▲</span></div>
-<div id="top"><span>💰 <b id="co">0</b></span><span>🌾 <b id="hy">0</b></span><span>⭐ <b id="lv">1</b></span><span>⚙️ <b id="mr">0</b></span><button id="bg">🎒</button></div><div id="dt"></div>
-<div id="hb"></div>
-<div id="st"><div id="kn"></div></div>
-<button id="dg">حفر</button>
-<div id="pn"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-const $=i=>document.getElementById(i),cv=$('c'),D=$('dt');
-const TL=[{n:'اليد',e:'✋',p:1,r:34,c:0,d:'تشيل قش وحدة وحدة'},{n:'الشوكة',e:'🔱',p:3,r:58,c:150,d:'٣ قش بالضربة ومدى أبعد'},{n:'المغناطيس',e:'🧲',p:2,r:60,c:400,m:1,d:'يسحب الأغراض أبكر'},{n:'كاشف المعادن',e:'📡',p:1,r:34,c:300,k:1,d:'سهم لأقرب كومة بيها شي'}];
-const IT=[{n:'إبرة',e:'🪡',v:40,w:40},{n:'مفتاح',e:'🗝️',v:60,w:22},{n:'عملة',e:'🪙',v:90,w:16},{n:'خاتم',e:'💍',v:250,w:11},{n:'ساعة',e:'⌚',v:500,w:6},{n:'ألماسة',e:'💎',v:2500,w:3.5},{n:'ذهبية',e:'✨',v:6000,w:1.5}];
-const ML=[{n:'حمار',e:'🐴',r:1,c:150,d:'يشيل قش لحاله'},{n:'عربانة',e:'🛒',r:5,c:800,d:'ينقل أكثر'},{n:'تراكتر',e:'🚜',r:25,c:4000,d:'شغل ثقيل'},{n:'مكبس قش',e:'🏭',r:120,c:20000,d:'مصنع كامل'}];
-const SK=[{n:'قوة الحفر',e:'💪',mx:5,par:-1,d:'+25% قش بالضربة'},{n:'سرعة الحفر',e:'⚡',mx:5,par:0,d:'ضربات أسرع'},{n:'الحمولة',e:'🎒',mx:5,par:-1,d:'+25 قش بالحمولة'},{n:'سعر القش',e:'💵',mx:5,par:2,d:'+15% سعر القش'},{n:'التاجر',e:'🤝',mx:5,par:3,d:'+20% سعر الأغراض'},{n:'الحظ',e:'🍀',mx:5,par:-1,d:'أغراض نادرة أكثر'},{n:'عين الصقر',e:'🦅',mx:3,par:5,d:'تلگي الأغراض أبكر'},{n:'الرشاقة',e:'👟',mx:5,par:1,d:'مشي أسرع'},{n:'مدير المزرعة',e:'📈',mx:5,par:3,d:'+25% إنتاج الآلات'}];
-SK.forEach(k=>k.dp=k.par<0?0:SK[k.par].dp+1);
-let S={co:0,hy:0,xp:0,lv:1,sp:0,own:[1,0,0,0],eq:0,inv:[],sk:SK.map(()=>0),mc:ML.map(()=>0)};
-try{Object.assign(S,JSON.parse(localStorage.getItem('nh')))}catch(e){}
-IT.forEach((_,i)=>S.inv[i]=S.inv[i]||0);
-const B={x:1010,y:840},pw=()=>1+.25*S.sk[0],iv=()=>420*.88**S.sk[1],cap=()=>25+25*S.sk[2],hp=()=>1+.15*S.sk[3],ip=()=>1+.2*S.sk[4],mr=()=>ML.reduce((a,m,i)=>a+m.r*S.mc[i],0)*(1+.25*S.sk[8]);
-const sv=()=>{try{localStorage.setItem('nh',JSON.stringify(S))}catch(e){}},WS=1800,rnd=(a,b)=>a+Math.random()*(b-a),rad=s=>38+34*s.hay/s.mx;
-let pt=0,lk=null,W,H,P={x:WS/2,y:WS/2,f:-.5},J={x:0,y:0},K=[],FX=[],dig=0,lD=0,t0=0,au;
-function fill(s){s.mx=rnd(250,500);s.hay=s.mx;s.it=[];const n=Math.random()<.3?0:1+(Math.random()*4|0);
- for(let i=0;i<n;i++){let r=Math.random()**(1/(1+.15*S.sk[5]))*100,k=0;while(k<IT.length-1&&(r-=IT[k].w)>0)k++;s.it.push({k,t:rnd(.1,.85)*s.mx,got:0})}}
-for(let i=0;i<9;i++){let s;do s={x:rnd(120,WS-120),y:rnd(120,WS-120),cd:0,sh:0};while(Math.hypot(s.x-P.x,s.y-P.y)<220);fill(s);K.push(s)}
-function bp(f){if(!au)return;try{const o=au.createOscillator();o.frequency.value=f;o.connect(au.destination);o.start();o.stop(au.currentTime+.15)}catch(e){}}
-function near(){let b=0,bd=1e9;for(const s of K)if(s.hay>0){const d=Math.hypot(P.x-s.x,P.y-s.y)-rad(s),a=Math.atan2(s.y-P.y,s.x-P.x)-P.f;if(Math.abs(Math.atan2(Math.sin(a),Math.cos(a)))<.8&&d<bd){bd=d;b=s}}return[b,bd]}
-function xp(n){S.xp+=n;while(S.xp>=50*S.lv){S.xp-=50*S.lv;S.lv++;S.sp++;FX.push({x:P.x,y:P.y-40,txt:'⭐ مستوى '+S.lv,life:2})}}
-function take(s,p,m,hand){const a=Math.min(s.hay,p);s.hay-=a;
- for(const i of s.it)if(!i.got&&s.hay<=i.t+s.mx*(.08*m+.04*S.sk[6])){i.got=1;S.inv[i.k]++;FX.push({x:s.x,y:s.y-rad(s)-10,txt:IT[i.k].e+' '+IT[i.k].n,life:1.5});if(hand){bp(300+i.k*120);navigator.vibrate&&navigator.vibrate(60);xp(10*(i.k+1))}}
- if(s.hay<=0)s.cd=40;return a}
-function act(){const T=TL[S.eq],[s,d]=near();if(!s||d>T.r||S.hy>=cap())return;
- s.sh=14;const a=take(s,Math.min(T.p*pw()*rnd(.8,1.2),cap()-S.hy),T.m?1:0,1);S.hy+=a;xp(a*.5);ui()}
-const ren=new THREE.WebGLRenderer({canvas:cv,antialias:true}),scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(70,1,1,1600),AR=$('ar'),AB=$('ab');
-cam.rotation.order='YXZ';scene.add(cam);scene.background=new THREE.Color(0x87ceeb);scene.fog=new THREE.Fog(0x87ceeb,250,1000);
-scene.add(new THREE.AmbientLight(0xffffff,.75));const sun=new THREE.DirectionalLight(0xfff0c8,.7);sun.position.set(300,500,200);scene.add(sun);
-function tex(c,cs,n){const k=document.createElement('canvas');k.width=k.height=64;const g=k.getContext('2d');g.fillStyle=c;g.fillRect(0,0,64,64);g.lineWidth=2;
- for(let i=0;i<n;i++){g.strokeStyle=cs[i%cs.length];const a=Math.random()*64,b=Math.random()*64,d=Math.random()*3;g.beginPath();g.moveTo(a,b);g.lineTo(a+Math.cos(d)*10,b+Math.sin(d)*10);g.stroke()}
- const t=new THREE.CanvasTexture(k);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t}
-const gt=tex('#2f6b3a',['#3d8048','#275a30'],160),ht=tex('#c9a227',['#e6c25a','#a87a1a','#f0cf63'],120),hg=new THREE.SphereGeometry(1,20,12,0,Math.PI*2,0,Math.PI/2);
-gt.repeat.set(160,160);
-const gr=new THREE.Mesh(new THREE.PlaneGeometry(4000,4000),new THREE.MeshLambertMaterial({map:gt}));gr.rotation.x=-Math.PI/2;gr.position.set(WS/2,0,WS/2);scene.add(gr);
-const bn=new THREE.Group(),bb=new THREE.Mesh(new THREE.BoxGeometry(70,40,50),new THREE.MeshLambertMaterial({color:0xa83232})),br=new THREE.Mesh(new THREE.ConeGeometry(52,26,4),new THREE.MeshLambertMaterial({color:0x5a3d1c}));
-bb.position.y=20;br.position.y=53;br.rotation.y=Math.PI/4;bn.add(bb,br);bn.position.set(B.x,0,B.y);scene.add(bn);
-const tm=new THREE.Mesh(new THREE.BoxGeometry(2,2,30),new THREE.MeshLambertMaterial({color:0x8b5a2b})),th=new THREE.Mesh(new THREE.BoxGeometry(12,2,6),new THREE.MeshLambertMaterial({color:0xaaaaaa}));
-th.position.z=-15;tm.add(th);tm.position.set(10,-10,-22);cam.add(tm);
-function mk(s){const m=new THREE.Mesh(hg,new THREE.MeshLambertMaterial({map:ht}));scene.add(m);return m}
-function arw(e,o){e.style.visibility=o?'visible':'hidden';if(o)e.style.transform='rotate('+(Math.atan2(o.y-P.y,o.x-P.x)-P.f)+'rad)'}
-cv.onpointerdown=e=>{lk=[e.pointerId,e.clientX,e.clientY];cv.setPointerCapture(e.pointerId)};
-cv.onpointermove=e=>{if(lk&&e.pointerId==lk[0]){P.f+=(e.clientX-lk[1])*.006;pt=Math.max(-.9,Math.min(.9,pt-(e.clientY-lk[2])*.004));lk[1]=e.clientX;lk[2]=e.clientY}};
-cv.onpointerup=cv.onpointercancel=()=>lk=null;
-function draw(t){let sw=0;
- cam.position.set(P.x,34+(Math.hypot(J.x,J.y)>.1?Math.sin(t/110)*1.5:0),P.y);cam.rotation.set(pt,-P.f-Math.PI/2,0);
- for(const s of K){const m=s.m||(s.m=mk(s)),r=rad(s),o=s.sh>0?(sw=1,s.sh--,Math.sin(t/20)*3):0;m.position.set(s.x+o,0,s.y);m.scale.set(r,s.hay>0?r*.9:3,r);m.material.color.set(s.hay>0?0xffffff:0x6b4a22)}
- th.material.color.set([0xe0b48a,0xaaaaaa,0xcc3333,0x33aa88][S.eq]);th.scale.x=[.5,1.4,1,.8][S.eq];tm.rotation.x=sw?-.5+Math.sin(t/45)*.5:-.35;
- let m=S.hy>=cap()?'🌾 الحمولة مليانة — روح للسوق 🏪':t<12000?'حرّك بالعصا، دوّر بسحب الشاشة، وقف قدام كومة تحفر':'',b=0,bd=1e9;
- if(TL[S.eq].k){for(const s of K)if(s.hay>0&&s.it.some(i=>!i.got)){const d=Math.hypot(s.x-P.x,s.y-P.y);if(d<bd){bd=d;b=s}}m=b?'📡 '+(bd/10|0)+' م':'📡 ما اكو شي'}
- arw(AR,b);arw(AB,(S.hy>0||val()>0)&&Math.hypot(B.x-P.x,B.y-P.y)>120?B:0);
- if(D.textContent!=m)D.textContent=m;
- for(const f of FX){const e=document.createElement('div');e.className='f';e.textContent=f.txt;e.style.marginLeft=(Math.random()*90-45)+'px';document.body.appendChild(e);setTimeout(()=>e.remove(),1600)}FX.length=0;
- ren.render(scene,cam)}
-let lU=0,lS=0;
-function loop(t){const dt=Math.min(.05,(t-t0)/1000||0);t0=t;const v=160*(1+.1*S.sk[7])*dt;
- {const fw=-J.y*v,sd=J.x*v,c=Math.cos(P.f),n=Math.sin(P.f);P.x=Math.max(20,Math.min(WS-20,P.x+fw*c-sd*n));P.y=Math.max(20,Math.min(WS-20,P.y+fw*n+sd*c))}
- {const d=Math.hypot(P.x-B.x,P.y-B.y);if(d<55&&d>0){P.x=B.x+(P.x-B.x)/d*55;P.y=B.y+(P.y-B.y)/d*55}}
- for(const s of K){if(s.hay>0){const d=Math.hypot(P.x-s.x,P.y-s.y),m=rad(s)+16;if(d<m&&d>0){P.x=s.x+(P.x-s.x)/d*m;P.y=s.y+(P.y-s.y)/d*m}}else if((s.cd-=dt)<=0)fill(s)}
- const r=mr();if(r>0){const s=K[Math.random()*K.length|0];if(s.hay>0)S.co+=take(s,r*dt,0,0)*hp()}
- if(Math.hypot(P.x-B.x,P.y-B.y)<90&&(S.hy>0||val()>0)){const g=S.hy*hp()+val();S.co+=g;S.hy=0;S.inv=IT.map(()=>0);FX.push({x:B.x,y:B.y-50,txt:'+'+(g|0)+' 💰',life:1.5});bp(660);ui();sv()}
- if((dig||Math.abs(J.x)+Math.abs(J.y)<.1)&&t-lD>iv()){lD=t;act()}
- if(t-lU>250){lU=t;ui()}if(t-lS>5000){lS=t;sv()}
- draw(t);requestAnimationFrame(loop)}
-const st=$('st'),kn=$('kn'),dg=$('dg');let sid=null;
-function mv(e){const b=st.getBoundingClientRect();let dx=e.clientX-b.left-65,dy=e.clientY-b.top-65;const d=Math.hypot(dx,dy),m=45;if(d>m){dx*=m/d;dy*=m/d}
- kn.style.transform='translate('+dx+'px,'+dy+'px)';J.x=dx/m;J.y=dy/m}
-st.onpointerdown=e=>{sid=e.pointerId;st.setPointerCapture(sid);mv(e)};
-st.onpointermove=e=>{if(e.pointerId==sid)mv(e)};
-st.onpointerup=st.onpointercancel=()=>{sid=null;J.x=J.y=0;kn.style.transform=''};
-dg.onpointerdown=e=>{dg.setPointerCapture(e.pointerId);dig=1;try{au=au||new(window.AudioContext||webkitAudioContext)();au.resume()}catch(_){}};
-dg.onpointerup=dg.onpointercancel=()=>dig=0;
-const val=()=>S.inv.reduce((a,n,i)=>a+n*IT[i].v,0)*ip(),cls=()=>$('pn').style.display='none';let tab=0;
-function ui(){$('co').textContent=S.co|0;$('hy').textContent=(S.hy|0)+'/'+cap();$('lv').textContent=S.lv+(S.sp?' ✦'+S.sp:'');$('mr').textContent=(mr()|0)+'/ث'}
-function hud(){ui();hbr()}
-function hbr(){$('hb').innerHTML=TL.map((o,i)=>S.own[i]?'<div class="s'+(S.eq==i?' on':'')+'" onpointerdown="S.eq='+i+';sv();hbr()">'+o.e+'</div>':'').join('')}
-function buy(i){if(S.own[i])S.eq=i;else if(S.co>=TL[i].c){S.co-=TL[i].c;S.own[i]=1;S.eq=i}sv();pan();hud()}
-function mb(i){const c=Math.round(ML[i].c*1.35**S.mc[i]);if(S.co>=c){S.co-=c;S.mc[i]++;sv();pan();ui()}else navigator.vibrate&&navigator.vibrate(80)}
-function up(i){const o=SK[i];if(S.sp>0&&S.sk[i]<o.mx&&(o.par<0||S.sk[o.par]>0)){S.sp--;S.sk[i]++;sv();pan();ui()}}
-function tb(n){tab=n;pan()}
-function pan(){const bt=(n,t)=>'<button class="'+(tab==n?'on':'')+'" onclick="tb('+n+')">'+t+'</button>';
- let q='<div class="tb">'+bt(0,'🎒 الحقيبة')+bt(1,'⚙️ الآلات')+bt(2,'🌳 المهارات')+'</div>';
- if(tab==0)q+='<div class="g">'+IT.map((o,i)=>'<div class="c">'+o.e+'<br>'+o.n+'<br><b>×'+S.inv[i]+'</b><br><small>'+o.v+'</small></div>').join('')+'</div><p>🌾 قش: <b>'+(S.hy|0)+'/'+cap()+'</b> — أغراض: <b>'+(val()|0)+'</b> 💰<br>روح للسوق 🏪 تبيع كل شي</p><h2>🛠️ الأدوات</h2>'+
-  TL.map((o,i)=>'<div class="r"><div>'+o.e+' '+o.n+'<br><small>'+o.d+'</small></div><button onclick="buy('+i+')" '+(!S.own[i]&&S.co<o.c?'disabled':'')+'>'+(S.own[i]?(S.eq==i?'مفعّلة ✓':'استخدم'):'شراء '+o.c+' 💰')+'</button></div>').join('');
- if(tab==1)q+='<p>الإنتاج: <b>'+(mr()|0)+'</b> قش/ثانية — تشتغل لحالها وتبيع تلقائي</p>'+ML.map((o,i)=>'<div class="r"><div>'+o.e+' '+o.n+' ×'+S.mc[i]+'<br><small>'+o.d+' (+'+o.r+'/ث)</small></div><button onclick="mb('+i+')">'+Math.round(o.c*1.35**S.mc[i])+' 💰</button></div>').join('');
- if(tab==2)q+='<p>نقاط المهارة: <b>'+S.sp+'</b> (نقطة لكل مستوى)</p>'+SK.map((o,i)=>{const L=o.par>=0&&!S.sk[o.par];return '<div class="r" style="padding-right:'+o.dp*18+'px;opacity:'+(L?.45:1)+'"><div>'+o.e+' '+o.n+' '+S.sk[i]+'/'+o.mx+'<br><small>'+o.d+'</small></div><button onclick="up('+i+')" '+(L||!S.sp||S.sk[i]>=o.mx?'disabled':'')+'>'+(L?'🔒':'+')+'</button></div>'}).join('');
- $('pn').innerHTML=q+'<br><button onclick="cls()">رجوع للعبة</button>'}
-$('bg').onclick=()=>{J.x=J.y=0;dig=0;pan();$('pn').style.display='block'};
-onresize=()=>{W=innerWidth;H=innerHeight;ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.setSize(W,H);cam.aspect=W/H;cam.updateProjectionMatrix()};onresize();hud();requestAnimationFrame(loop);
-if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
-</script></body></html>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#facc15">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>HAYSTACK 3D - Ultimate Simulator</title>
+
+  <!-- Dynamic Web App Manifest Injection -->
+  <link rel="manifest" id="manifest-placeholder">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #111827;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    #game-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* HUD Layer */
+    #hud-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: env(safe-area-inset-top, 12px) env(safe-area-inset-right, 12px) env(safe-area-inset-bottom, 12px) env(safe-area-inset-left, 12px);
+    }
+    .hud-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      width: 100%;
+      gap: 8px;
+    }
+    .hud-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .stat-pill {
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      padding: 5px 12px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+    }
+    .stat-pill.money { color: #4ade80; border-color: rgba(74, 222, 128, 0.4); }
+    .stat-pill.hay { color: #facc15; border-color: rgba(250, 204, 21, 0.4); }
+    .stat-pill.level {
+      color: #c084fc;
+      border-color: rgba(192, 132, 252, 0.4);
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      min-width: 110px;
+    }
+    .xp-bar-bg {
+      width: 100%;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .xp-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #c084fc, #e879f9);
+      transition: width 0.3s ease;
+    }
+
+    /* Menu Buttons */
+    .menu-btn {
+      pointer-events: auto;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #fff;
+      border-radius: 14px;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+      position: relative;
+    }
+    .menu-btn:active { transform: scale(0.95); }
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      background-color: #ef4444;
+      border-radius: 50%;
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      display: none;
+      box-shadow: 0 0 6px #ef4444;
+    }
+
+    /* Event Notification Banner */
+    #event-banner {
+      position: absolute;
+      top: 55px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(90deg, rgba(234, 179, 8, 0.95), rgba(202, 138, 4, 0.95));
+      border: 1.5px solid #fef08a;
+      border-radius: 20px;
+      padding: 6px 18px;
+      color: #0f172a;
+      font-size: 12px;
+      font-weight: 800;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      z-index: 50;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+      animation: pulse 1.8s infinite;
+      white-space: nowrap;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: translateX(-50%) scale(1); }
+      50% { transform: translateX(-50%) scale(1.03); }
+    }
+
+    /* Interaction Prompt */
+    #crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 6px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.75);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 5;
+    }
+    #interaction-prompt {
+      position: absolute;
+      top: 58%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.94);
+      border: 1.5px solid #facc15;
+      border-radius: 12px;
+      padding: 6px 18px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+      z-index: 10;
+      white-space: nowrap;
+    }
+
+    /* Mobile Controls */
+    #mobile-controls {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 8;
+      pointer-events: none;
+    }
+    #touch-look-zone {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 50%;
+      height: 100%;
+      pointer-events: auto;
+    }
+    #joystick-container {
+      position: absolute;
+      bottom: 24px;
+      left: 24px;
+      width: 120px;
+      height: 120px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      pointer-events: auto;
+      touch-action: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #joystick-knob {
+      width: 50px;
+      height: 50px;
+      background: radial-gradient(circle, #facc15 15%, #ca8a04 90%);
+      border-radius: 50%;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+      transform: translate(0px, 0px);
+      pointer-events: none;
+    }
+    .action-buttons-group {
+      position: absolute;
+      bottom: 18px;
+      right: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-end;
+      pointer-events: auto;
+    }
+    .hud-btn-row { display: flex; gap: 8px; }
+    .hud-btn {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: rgba(30, 41, 59, 0.9);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+      cursor: pointer;
+      touch-action: none;
+      transition: transform 0.08s;
+    }
+    .hud-btn:active { transform: scale(0.92); }
+    .hud-btn.primary {
+      width: 72px;
+      height: 72px;
+      background: linear-gradient(135deg, #eab308, #ca8a04);
+      border-color: #fef08a;
+      color: #1f2937;
+      font-size: 13px;
+    }
+
+    /* Modals & Dialogs */
+    .modal {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.95);
+      background: rgba(15, 23, 42, 0.96);
+      border: 1px solid rgba(250, 204, 21, 0.4);
+      border-radius: 18px;
+      width: 92%;
+      max-width: 480px;
+      max-height: 86vh;
+      color: #fff;
+      z-index: 100;
+      padding: 16px;
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 20px 45px rgba(0,0,0,0.8);
+      backdrop-filter: blur(14px);
+      pointer-events: auto;
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    .modal.active {
+      display: flex;
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      padding-bottom: 8px;
+    }
+    .modal-header h2 { font-size: 16px; color: #facc15; }
+    .close-btn {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 24px;
+      cursor: pointer;
+    }
+    .inventory-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      max-height: 230px;
+      overflow-y: auto;
+      padding: 2px;
+    }
+    .inv-slot {
+      aspect-ratio: 1;
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      font-size: 11px;
+    }
+    .inv-slot.filled { border-color: rgba(250, 204, 21, 0.5); }
+    .inv-slot .count {
+      position: absolute;
+      bottom: 3px;
+      right: 5px;
+      font-weight: bold;
+      color: #facc15;
+      font-size: 10px;
+    }
+    .inv-slot .icon { font-size: 18px; }
+
+    .item-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+    .list-card {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 10px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .card-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+    }
+    .card-title { font-weight: bold; font-size: 12px; color: #f1f5f9; }
+    .card-desc { font-size: 11px; color: #94a3b8; }
+    .card-badge { font-size: 10px; font-weight: bold; color: #facc15; }
+
+    .action-btn-sm {
+      background: #4ade80;
+      color: #0f172a;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-weight: 700;
+      font-size: 11px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .action-btn-sm:disabled {
+      background: #475569;
+      color: #94a3b8;
+      cursor: not-allowed;
+    }
+
+    #toast {
+      position: absolute;
+      top: 65px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid #4ade80;
+      color: #fff;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+      z-index: 200;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.25s, transform 0.25s;
+      text-align: center;
+    }
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(10px);
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+  <!-- WebGL Canvas -->
+  <canvas id="game-canvas"></canvas>
+
+  <div id="crosshair"></div>
+  <div id="interaction-prompt">
+    <span id="prompt-icon">🌾</span>
+    <span id="prompt-text">إزالة القش</span>
+  </div>
+
+  <!-- Random Event Banner -->
+  <div id="event-banner">
+    <span id="event-banner-icon">⚡</span>
+    <span id="event-banner-text">حدث خاص جارٍ!</span>
+    <span id="event-banner-timer" style="background: rgba(0,0,0,0.25); padding: 2px 6px; border-radius: 8px;">30s</span>
+  </div>
+
+  <!-- HUD Layer -->
+  <div id="hud-layer">
+    <div class="hud-top">
+      <div class="hud-group">
+        <div class="stat-pill level">
+          <div style="display: flex; justify-content: space-between; width: 100%;">
+            <span id="hud-level-txt">المستوى 1</span>
+            <span id="hud-xp-txt" style="color: #cbd5e1; font-size: 10px;">0/100</span>
+          </div>
+          <div class="xp-bar-bg">
+            <div class="xp-bar-fill" id="hud-xp-fill"></div>
+          </div>
+        </div>
+        <div class="stat-pill money">
+          <span>💰</span>
+          <span id="hud-money">$0</span>
+        </div>
+        <div class="stat-pill hay">
+          <span>🌾</span>
+          <span id="hud-hay">قش: 0</span>
+        </div>
+      </div>
+
+      <div class="hud-group">
+        <button class="menu-btn" id="btn-open-skills">
+          <span>🧠 المهارات</span>
+          <span id="sp-indicator" style="color: #c084fc;">(0)</span>
+        </button>
+        <button class="menu-btn" id="btn-open-missions">
+          <span>📋 المهام</span>
+          <div class="badge-dot" id="mission-badge"></div>
+        </button>
+        <button class="menu-btn" id="btn-open-settings">
+          <span>⚙️️ الضبط</span>
+        </button>
+        <button class="menu-btn" id="btn-pwa-install" style="display: none; background: #ca8a04;">
+          <span>📲 تثبيت</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Touch Controls -->
+  <div id="mobile-controls">
+    <div id="touch-look-zone"></div>
+    <div id="joystick-container">
+      <div id="joystick-knob"></div>
+    </div>
+    <div class="action-buttons-group">
+      <div class="hud-btn-row">
+        <button class="hud-btn" id="btn-inventory">🎒<br>الحقيبة</button>
+        <button class="hud-btn" id="btn-interact">🤝<br>تفاعل</button>
+      </div>
+      <div class="hud-btn-row">
+        <button class="hud-btn" id="btn-jump">⬆️<br>قفز</button>
+        <button class="hud-btn primary" id="btn-action">💥<br>عمل</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modals -->
+  <!-- 1. Inventory -->
+  <div class="modal" id="modal-inventory">
+    <div class="modal-header">
+      <h2>حقيبة العناصر</h2>
+      <button class="close-btn" id="btn-close-inv">&times;</button>
+    </div>
+    <div class="inventory-grid" id="inv-slots-container"></div>
+    <div style="font-size: 11px; color: #94a3b8; text-align: center;">انقر على الأداة لتجهيزها في يدك</div>
+  </div>
+
+  <!-- 2. Shop -->
+  <div class="modal" id="modal-shop">
+    <div class="modal-header">
+      <h2>محطة التجارة والترقيات</h2>
+      <button class="close-btn" id="btn-close-shop">&times;</button>
+    </div>
+    <div class="item-list">
+      <div class="list-card">
+        <div class="card-info">
+          <span class="card-title">بيع المحاصيل الزراعية</span>
+          <span class="card-desc">سعر القش العادي: $1 | القش المعالج: $3</span>
+        </div>
+        <button class="action-btn-sm" id="btn-sell-hay">بيع الكل</button>
+      </div>
+      <div class="list-card">
+        <div class="card-info">
+          <span class="card-title">بيع الإبر والكنوز</span>
+          <span class="card-desc">بيع الإبر الحديدية، الفضية، والذهبية</span>
+        </div>
+        <button class="action-btn-sm" id="btn-sell-items">بيع الكنوز</button>
+      </div>
+      <div class="list-card">
+        <div class="card-info">
+          <span class="card-title">مجرفة قش صغيرة (Small Rake)</span>
+          <span class="card-desc">تحصد 3x قش مع تعزيز فرصة الكنوز</span>
+        </div>
+        <button class="action-btn-sm" id="btn-buy-rake">شراء ($25)</button>
+      </div>
+      <div class="list-card">
+        <div class="card-info">
+          <span class="card-title">آلة معالجة القش (Mk-1)</span>
+          <span class="card-desc">تعالج القش وتبحث عن الإبر آلياً</span>
+        </div>
+        <button class="action-btn-sm" id="btn-buy-machine">شراء ($80)</button>
+      </div>
+      <div class="list-card">
+        <div class="card-info">
+          <span class="card-title">نظام سيور النقل والفرز الآلي (Conveyor)</span>
+          <span class="card-desc">ينقل القش ويفرزه تلقائياً نحو حاوية الجمع</span>
+        </div>
+        <button class="action-btn-sm" id="btn-buy-conveyor">شراء ($150)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Skills -->
+  <div class="modal" id="modal-skills">
+    <div class="modal-header">
+      <h2>شجرة المهارات</h2>
+      <button class="close-btn" id="btn-close-skills">&times;</button>
+    </div>
+    <div style="font-size: 12px; color: #c084fc;">نقاط المهارة المتاحة (Skill Points): <strong id="sp-count-modal">0</strong></div>
+    <div class="item-list" id="skills-list-container"></div>
+  </div>
+
+  <!-- 4. Missions -->
+  <div class="modal" id="modal-missions">
+    <div class="modal-header">
+      <h2>سجل المهام والمكافآت</h2>
+      <button class="close-btn" id="btn-close-missions">&times;</button>
+    </div>
+    <div class="item-list" id="missions-list-container"></div>
+  </div>
+
+  <!-- 5. Settings & Performance -->
+  <div class="modal" id="modal-settings">
+    <div class="modal-header">
+      <h2>إعدادات اللعبة والأداء</h2>
+      <button class="close-btn" id="btn-close-settings">&times;</button>
+    </div>
+    <div class="item-list">
+      <div class="list-card">
+        <div class="card-info">
+          <span class="card-title">مستوى الجودة الرسومية (Graphics)</span>
+          <span class="card-desc">تعديل الدقة والظلال لاستهداف 60 FPS</span>
+        </div>
+        <select id="select-graphics" style="background:#1e293b; color:#fff; border:1px solid #475569; padding:4px 8px; border-radius:6px; font-weight:bold;">
+          <option value="high">مرتفعة (High)</option>
+          <option value="med" selected>متوسطة (Medium)</option>
+          <option value="low">منخفضة (Low 60 FPS)</option>
+        </select>
+      </div>
+      <div class="list-card">
+        <div class="card-info">
+          <span class="card-title">حفظ اللعبة يدوياً</span>
+          <span class="card-desc">حفظ فوري لحالة المزرعة في متصفحك</span>
+        </div>
+        <button class="action-btn-sm" id="btn-manual-save">حفظ الآن</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast">تم الحفظ التلقائي!</div>
+
+  <script>
+    /**
+     * =========================================================================
+     * HAYSTACK SIMULATOR - PHASE 3
+     * Complete Engine: Conveyor Line + Random Events + PWA + Performance Tuner
+     * =========================================================================
+     */
+
+    // --- PWA SETUP VIA DATA-URI MANIFEST & INLINE SW ---
+    (function setupPWA() {
+      const manifestJSON = {
+        name: "HAYSTACK 3D Simulator",
+        short_name: "Haystack",
+        start_url: window.location.href,
+        display: "standalone",
+        background_color: "#111827",
+        theme_color: "#facc15",
+        orientation: "landscape"
+      };
+      const blob = new Blob([JSON.stringify(manifestJSON)], { type: 'application/json' });
+      const manifestUrl = URL.createObjectURL(blob);
+      document.getElementById('manifest-placeholder').setAttribute('href', manifestUrl);
+
+      if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+        const swScript = `
+          const CACHE = 'haystack-v3';
+          self.addEventListener('install', e => { self.skipWaiting(); });
+          self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
+          self.addEventListener('fetch', e => {
+            e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+          });
+        `;
+        const swBlob = new Blob([swScript], { type: 'application/javascript' });
+        navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(() => {});
+      }
+    })();
+
+    // --- 1. WEB AUDIO SYNTHESIZER ---
+    class SoundSystem {
+      constructor() {
+        this.ctx = null;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+      playRustle() {
+        if (!this.ctx) return;
+        const bufferSize = this.ctx.sampleRate * 0.12;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.35));
+        }
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 1100;
+        filter.Q.value = 2.0;
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        noise.start();
+      }
+      playCoin() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(987.77, this.ctx.currentTime);
+        osc.frequency.setValueAtTime(1318.51, this.ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.3);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.3);
+      }
+      playNeedleFind() {
+        if (!this.ctx) return;
+        const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.18, this.ctx.currentTime + idx * 0.06);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + idx * 0.06 + 0.3);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(this.ctx.currentTime + idx * 0.06);
+          osc.stop(this.ctx.currentTime + idx * 0.06 + 0.3);
+        });
+      }
+      playLevelUp() {
+        if (!this.ctx) return;
+        const notes = [440, 554.37, 659.25, 880];
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.15, this.ctx.currentTime + idx * 0.1);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + idx * 0.1 + 0.4);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(this.ctx.currentTime + idx * 0.1);
+          osc.stop(this.ctx.currentTime + idx * 0.1 + 0.4);
+        });
+      }
+      playStep() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(110, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.07);
+        gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.07);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.07);
+      }
+      playMachineClank() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(80, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.09, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.12);
+      }
+      playEventTrigger() {
+        if (!this.ctx) return;
+        const notes = [330, 392, 523, 659];
+        notes.forEach((f, i) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.value = f;
+          gain.gain.setValueAtTime(0.2, this.ctx.currentTime + i * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + i * 0.08 + 0.25);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(this.ctx.currentTime + i * 0.08);
+          osc.stop(this.ctx.currentTime + i * 0.08 + 0.25);
+        });
+      }
+    }
+
+    // --- 2. INDEXED-DB PERSISTENCE ---
+    class SaveSystem {
+      constructor() {
+        this.dbName = 'HaystackDB_v3';
+        this.dbVersion = 1;
+        this.db = null;
+      }
+      async init() {
+        return new Promise((resolve) => {
+          if (!window.indexedDB) return resolve(false);
+          const request = indexedDB.open(this.dbName, this.dbVersion);
+          request.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('gamestate')) {
+              db.createObjectStore('gamestate', { keyPath: 'id' });
+            }
+          };
+          request.onsuccess = (e) => {
+            this.db = e.target.result;
+            resolve(true);
+          };
+          request.onerror = () => resolve(false);
+        });
+      }
+      async save(state) {
+        if (this.db) {
+          try {
+            const tx = this.db.transaction('gamestate', 'readwrite');
+            tx.objectStore('gamestate').put({ id: 'save_slot_main', data: state, timestamp: Date.now() });
+          } catch(e) {
+            localStorage.setItem('haystack_v3_backup', JSON.stringify(state));
+          }
+        } else {
+          localStorage.setItem('haystack_v3_backup', JSON.stringify(state));
+        }
+      }
+      async load() {
+        if (this.db) {
+          return new Promise((resolve) => {
+            try {
+              const tx = this.db.transaction('gamestate', 'readonly');
+              const req = tx.objectStore('gamestate').get('save_slot_main');
+              req.onsuccess = () => {
+                if (req.result && req.result.data) resolve(req.result.data);
+                else resolve(this.loadFallback());
+              };
+              req.onerror = () => resolve(this.loadFallback());
+            } catch(e) {
+              resolve(this.loadFallback());
+            }
+          });
+        }
+        return this.loadFallback();
+      }
+      loadFallback() {
+        const raw = localStorage.getItem('haystack_v3_backup') || localStorage.getItem('haystack_v2_backup') || localStorage.getItem('haystack_backup');
+        return raw ? JSON.parse(raw) : null;
+      }
+    }
+
+    // --- 3. ITEMS & INVENTORY SYSTEM ---
+    const ITEM_DATABASE = {
+      hay: { id: 'hay', name: 'قش عادي', icon: '🌾', value: 1, rarity: 'Common' },
+      processed_hay: { id: 'processed_hay', name: 'قش معالج ومصفى', icon: '📦', value: 3, rarity: 'Uncommon' },
+      needle_iron: { id: 'needle_iron', name: 'إبرة حديدية', icon: '🪡', value: 20, rarity: 'Uncommon' },
+      needle_silver: { id: 'needle_silver', name: 'إبرة فضية لامعة', icon: '✨', value: 65, rarity: 'Rare' },
+      needle_gold: { id: 'needle_gold', name: 'إبرة ذهبية أثرية', icon: '🌟', value: 200, rarity: 'Epic' },
+      rake_small: { id: 'rake_small', name: 'مجرفة قش صغيرة', icon: '🧹', value: 25, rarity: 'Common', isTool: true, toolId: 'small_rake' }
+    };
+
+    class Inventory {
+      constructor(size = 16) {
+        this.size = size;
+        this.slots = new Array(size).fill(null);
+      }
+      addItem(itemId, amount = 1) {
+        const def = ITEM_DATABASE[itemId];
+        if (!def) return 0;
+        if (!def.isTool) {
+          for (let i = 0; i < this.size; i++) {
+            if (this.slots[i] && this.slots[i].id === itemId) {
+              this.slots[i].amount += amount;
+              return amount;
+            }
+          }
+        }
+        for (let i = 0; i < this.size; i++) {
+          if (!this.slots[i]) {
+            this.slots[i] = { id: itemId, amount: amount };
+            return amount;
+          }
+        }
+        return 0;
+      }
+      getItemCount(itemId) {
+        let count = 0;
+        for (const s of this.slots) {
+          if (s && s.id === itemId) count += s.amount;
+        }
+        return count;
+      }
+      removeItem(itemId, amount) {
+        let remaining = amount;
+        for (let i = 0; i < this.size; i++) {
+          const s = this.slots[i];
+          if (s && s.id === itemId) {
+            if (s.amount <= remaining) {
+              remaining -= s.amount;
+              this.slots[i] = null;
+            } else {
+              s.amount -= remaining;
+              remaining = 0;
+            }
+            if (remaining <= 0) break;
+          }
+        }
+      }
+      loadSlots(savedSlots) {
+        if (Array.isArray(savedSlots)) this.slots = savedSlots.slice(0, this.size);
+      }
+    }
+
+    // --- 4. TOOL SYSTEM ---
+    const TOOLS_CONFIG = {
+      hands: { id: 'hands', name: 'يد فارغة', hayPerUse: 1, cooldown: 380, needleChanceBonus: 1.0 },
+      small_rake: { id: 'small_rake', name: 'مجرفة قش صغيرة', hayPerUse: 3, cooldown: 320, needleChanceBonus: 1.8 }
+    };
+
+    // --- 5. PROGRESSION & LEVEL SYSTEM ---
+    class ProgressionSystem {
+      constructor(onLevelUpCallback) {
+        this.level = 1;
+        this.xp = 0;
+        this.skillPoints = 0;
+        this.onLevelUp = onLevelUpCallback;
+      }
+      getXpForNextLevel(lvl = this.level) {
+        return Math.floor(100 * Math.pow(1.35, lvl - 1));
+      }
+      addXP(amount) {
+        this.xp += amount;
+        let needed = this.getXpForNextLevel();
+        while (this.xp >= needed) {
+          this.xp -= needed;
+          this.level++;
+          this.skillPoints++;
+          needed = this.getXpForNextLevel();
+          if (this.onLevelUp) this.onLevelUp(this.level, this.skillPoints);
+        }
+      }
+    }
+
+    // --- 6. SKILL TREE SYSTEM ---
+    class SkillTree {
+      constructor() {
+        this.skills = {
+          hawk_eye: { name: 'عين الصقر', desc: 'تزيد فرصة العثور على الإبر النادرة بنسبة +25%', level: 0, max: 5 },
+          heavy_sweep: { name: 'قوة الحصاد', desc: 'تزيد كمية القش المحصود لكل ضربة بمقدار +1', level: 0, max: 5 },
+          agility: { name: 'خفة الحركة', desc: 'تزيد سرعة ركض وحركة اللاعب بنسبة +15%', level: 0, max: 3 },
+          master_trader: { name: 'التاجر البارع', desc: 'تزيد قيمة بيع جميع المحاصيل بنسبة +20%', level: 0, max: 5 }
+        };
+      }
+      upgradeSkill(skillId, progression) {
+        const skill = this.skills[skillId];
+        if (skill && skill.level < skill.max && progression.skillPoints > 0) {
+          progression.skillPoints--;
+          skill.level++;
+          return true;
+        }
+        return false;
+      }
+    }
+
+    // --- 7. MISSION SYSTEM ---
+    class MissionSystem {
+      constructor(game) {
+        this.game = game;
+        this.missions = [
+          { id: 'm_hay_1', title: 'بداية الحصاد', desc: 'اجمع 25 حزمة قش من الكومة', target: 25, current: 0, rewardXP: 45, rewardMoney: 15, completed: false, claimed: false },
+          { id: 'm_needle_1', title: 'سر الكومة', desc: 'اعثر على أول إبرة أياً كان نوعها', target: 1, current: 0, rewardXP: 80, rewardMoney: 30, completed: false, claimed: false },
+          { id: 'm_earn_1', title: 'رأس مال المزرعة', desc: 'اكسب $50 من التجارة والبيع', target: 50, current: 0, rewardXP: 100, rewardMoney: 25, completed: false, claimed: false },
+          { id: 'm_rake_1', title: 'ترقية العتاد', desc: 'امتلك مجرفة القش الصغيرة', target: 1, current: 0, rewardXP: 120, rewardMoney: 40, completed: false, claimed: false },
+          { id: 'm_machine_1', title: 'عصر الميكنة', desc: 'امتلك آلة معالجة القش التلقائية', target: 1, current: 0, rewardXP: 200, rewardMoney: 80, completed: false, claimed: false },
+          { id: 'm_conveyor_1', title: 'خط الإنتاج المتكامل', desc: 'امتلك وشغّل سير النقل الآلي', target: 1, current: 0, rewardXP: 280, rewardMoney: 120, completed: false, claimed: false }
+        ];
+      }
+      trackProgress(type, amount) {
+        let hasNew = false;
+        this.missions.forEach(m => {
+          if (!m.completed) {
+            if (m.id === 'm_hay_1' && type === 'hay') m.current = Math.min(m.target, m.current + amount);
+            if (m.id === 'm_needle_1' && type === 'needle') m.current = Math.min(m.target, m.current + amount);
+            if (m.id === 'm_earn_1' && type === 'money_earned') m.current = Math.min(m.target, m.current + amount);
+            if (m.id === 'm_rake_1' && type === 'has_rake') m.current = 1;
+            if (m.id === 'm_machine_1' && type === 'has_machine') m.current = 1;
+            if (m.id === 'm_conveyor_1' && type === 'has_conveyor') m.current = 1;
+
+            if (m.current >= m.target) {
+              m.completed = true;
+              hasNew = true;
+            }
+          }
+        });
+        if (hasNew) {
+          this.game.sounds.playCoin();
+          this.game.showToast('📋 أنجزت مهمة جديدة! تفقد سجل المهام');
+          this.updateBadge();
+        }
+      }
+      claimReward(missionId) {
+        const m = this.missions.find(x => x.id === missionId);
+        if (m && m.completed && !m.claimed) {
+          m.claimed = true;
+          this.game.progression.addXP(m.rewardXP);
+          this.game.money += m.rewardMoney;
+          this.game.sounds.playLevelUp();
+          this.game.updateHUD();
+          this.updateBadge();
+          this.game.showToast(`استلمت: $${m.rewardMoney} و +${m.rewardXP} XP!`);
+          return true;
+        }
+        return false;
+      }
+      hasUnclaimed() {
+        return this.missions.some(m => m.completed && !m.claimed);
+      }
+      updateBadge() {
+        const badge = document.getElementById('mission-badge');
+        badge.style.display = this.hasUnclaimed() ? 'block' : 'none';
+      }
+    }
+
+    // --- 8. CONVEYOR BELT & AUTOMATION LINE ---
+    class ConveyorSystem {
+      constructor(scene, sounds) {
+        this.scene = scene;
+        this.sounds = sounds;
+        this.owned = false;
+        this.startPos = new THREE.Vector3(2, 0, -6);
+        this.endPos = new THREE.Vector3(10, 0, 7);
+        this.collectorPos = new THREE.Vector3(10, 0, 8.5);
+        this.storageBuffer = 0;
+        this.timer = 0;
+
+        this.bales = [];
+        this.build3DConveyor();
+      }
+
+      build3DConveyor() {
+        this.group = new THREE.Group();
+
+        // Conveyor Rails & Frame
+        const length = this.startPos.distanceTo(this.endPos);
+        const frameGeo = new THREE.BoxGeometry(0.8, 0.25, length);
+        const frameMat = new THREE.MeshLambertMaterial({ color: 0x334155 });
+        this.frameMesh = new THREE.Mesh(frameGeo, frameMat);
+
+        // Position & Rotate Frame towards EndPos
+        const midPoint = new THREE.Vector3().addVectors(this.startPos, this.endPos).multiplyScalar(0.5);
+        this.frameMesh.position.set(midPoint.x, 0.45, midPoint.z);
+        this.frameMesh.lookAt(this.endPos.x, 0.45, this.endPos.z);
+        this.group.add(this.frameMesh);
+
+        // Legs
+        const legGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.9);
+        const legMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
+        for (let i = 0.2; i <= 0.8; i += 0.3) {
+          const lp = new THREE.Vector3().lerpVectors(this.startPos, this.endPos, i);
+          [-0.35, 0.35].forEach(ox => {
+            const leg = new THREE.Mesh(legGeo, legMat);
+            leg.position.set(lp.x + ox, 0.45, lp.z);
+            this.group.add(leg);
+          });
+        }
+
+        // Output Collector Hopper / Bin at end
+        const binGeo = new THREE.BoxGeometry(1.4, 1.0, 1.4);
+        const binMat = new THREE.MeshLambertMaterial({ color: 0xca8a04 });
+        this.binMesh = new THREE.Mesh(binGeo, binMat);
+        this.binMesh.position.set(this.collectorPos.x, 0.5, this.collectorPos.y + 7);
+        this.group.add(this.binMesh);
+
+        // Physical Moving Bales along conveyor
+        const baleGeo = new THREE.BoxGeometry(0.35, 0.25, 0.35);
+        const baleMat = new THREE.MeshLambertMaterial({ color: 0xeab308 });
+        for (let i = 0; i < 4; i++) {
+          const bale = new THREE.Mesh(baleGeo, baleMat);
+          bale.visible = false;
+          this.group.add(bale);
+          this.bales.push({ mesh: bale, progress: i * 0.25 });
+        }
+
+        this.scene.add(this.group);
+      }
+
+      update(delta, game) {
+        if (!this.owned) {
+          this.bales.forEach(b => b.mesh.visible = false);
+          return;
+        }
+
+        // Animate Bales Travelling along line
+        this.bales.forEach(b => {
+          b.mesh.visible = true;
+          b.progress += delta * 0.25;
+          if (b.progress >= 1.0) {
+            b.progress = 0;
+            this.storageBuffer += 1;
+            this.sounds.playMachineClank();
+            game.vfx.spawnHayBurst(this.collectorPos.x, 0.8, this.collectorPos.z);
+          }
+          const curPos = new THREE.Vector3().lerpVectors(this.startPos, this.endPos, b.progress);
+          b.mesh.position.set(curPos.x, 0.65, curPos.z);
+        });
+      }
+
+      collect(game) {
+        if (!this.owned) return;
+        if (this.storageBuffer === 0) {
+          game.showToast('حاوية سير النقل فارغة حالياً');
+          return;
+        }
+        const collected = this.storageBuffer;
+        this.storageBuffer = 0;
+        game.inventory.addItem('processed_hay', collected);
+        game.sounds.playRustle();
+        game.updateHUD();
+        game.showToast(`تم تفريغ خط النقل: ${collected} قش معالج جاهز!`);
+      }
+    }
+
+    // --- 9. RANDOM EVENTS ENGINE ---
+    class RandomEventManager {
+      constructor(game) {
+        this.game = game;
+        this.activeEvent = null;
+        this.timeRemaining = 0;
+        this.nextEventCheck = 35; // Initial cooldown
+
+        this.banner = document.getElementById('event-banner');
+        this.bannerIcon = document.getElementById('event-banner-icon');
+        this.bannerText = document.getElementById('event-banner-text');
+        this.bannerTimer = document.getElementById('event-banner-timer');
+      }
+
+      update(delta) {
+        if (this.activeEvent) {
+          this.timeRemaining -= delta;
+          this.bannerTimer.textContent = `${Math.ceil(this.timeRemaining)}s`;
+          if (this.timeRemaining <= 0) {
+            this.endEvent();
+          }
+        } else {
+          this.nextEventCheck -= delta;
+          if (this.nextEventCheck <= 0) {
+            this.triggerRandomEvent();
+            this.nextEventCheck = 65 + Math.random() * 40; // Every 65-105s
+          }
+        }
+      }
+
+      triggerRandomEvent() {
+        const pool = ['golden_pile', 'vip_order', 'magnetic_rush'];
+        const chosen = pool[Math.floor(Math.random() * pool.length)];
+
+        this.activeEvent = chosen;
+        this.timeRemaining = 40;
+        this.banner.style.display = 'flex';
+        this.game.sounds.playEventTrigger();
+
+        if (chosen === 'golden_pile') {
+          this.bannerIcon.textContent = '🌟';
+          this.bannerText.textContent = 'شحنة قش ذهبية نادرة ظهرت بالساحة!';
+          this.game.spawnGoldenPile();
+          this.game.showToast('🌟 حدث نادر! ظهرت كومة قش ذهبية في المزرعة!');
+        } else if (chosen === 'vip_order') {
+          this.bannerIcon.textContent = '🎩';
+          this.bannerText.textContent = 'تاجر عاجل: مضاعفة أرباح البيع +150% الآن!';
+          this.game.showToast('🎩 التاجر المميز متواجد في الكشك ويشتري بأسعار مضاعفة!');
+        } else if (chosen === 'magnetic_rush') {
+          this.bannerIcon.textContent = '🧲';
+          this.bannerText.textContent = 'عاصفة ممغنطة: فرصة العثور على الإبر 300%!';
+          this.game.showToast('🧲 عاصفة مغناطيسية ترفع احتمالات الإبر لأقصى حد!');
+        }
+      }
+
+      endEvent() {
+        if (this.activeEvent === 'golden_pile') {
+          this.game.removeGoldenPile();
+        }
+        this.activeEvent = null;
+        this.banner.style.display = 'none';
+        this.game.showToast('انتهى مفعول الحدث الخاص');
+      }
+    }
+
+    // --- 10. VFX PARTICLE ENGINE ---
+    class ParticleEngine {
+      constructor(scene) {
+        this.scene = scene;
+        this.particles = [];
+        this.densityFactor = 1.0;
+      }
+      spawnHayBurst(x, y, z, isGold = false) {
+        const count = Math.round(14 * this.densityFactor);
+        if (count <= 0) return;
+        const pGeo = new THREE.BufferGeometry();
+        const positions = new Float32Array(count * 3);
+        const velocities = [];
+
+        for (let i = 0; i < count; i++) {
+          positions[i * 3] = x + (Math.random() - 0.5) * 0.4;
+          positions[i * 3 + 1] = y + 0.3;
+          positions[i * 3 + 2] = z + (Math.random() - 0.5) * 0.4;
+          velocities.push(new THREE.Vector3(
+            (Math.random() - 0.5) * 2.5,
+            1.8 + Math.random() * 2.0,
+            (Math.random() - 0.5) * 2.5
+          ));
+        }
+        pGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const pMat = new THREE.PointsMaterial({ color: isGold ? 0xfef08a : 0xfacc15, size: 0.18 });
+        const pMesh = new THREE.Points(pGeo, pMat);
+        this.scene.add(pMesh);
+        this.particles.push({ mesh: pMesh, velocities: velocities, life: 0.65 });
+      }
+
+      spawnSmoke(x, y, z) {
+        if (this.densityFactor < 0.5) return;
+        const pGeo = new THREE.BufferGeometry();
+        pGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([x, y, z]), 3));
+        const pMat = new THREE.PointsMaterial({ color: 0x94a3b8, size: 0.3, transparent: true, opacity: 0.8 });
+        const pMesh = new THREE.Points(pGeo, pMat);
+        this.scene.add(pMesh);
+        this.particles.push({
+          mesh: pMesh,
+          velocities: [new THREE.Vector3((Math.random() - 0.5) * 0.3, 1.2, (Math.random() - 0.5) * 0.3)],
+          life: 0.9
+        });
+      }
+
+      update(delta) {
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+          const p = this.particles[i];
+          p.life -= delta;
+          const pos = p.mesh.geometry.attributes.position;
+          for (let j = 0; j < p.velocities.length; j++) {
+            pos.setXYZ(
+              j,
+              pos.getX(j) + p.velocities[j].x * delta,
+              pos.getY(j) + p.velocities[j].y * delta,
+              pos.getZ(j) + p.velocities[j].z * delta
+            );
+            p.velocities[j].y -= 4.0 * delta;
+          }
+          pos.needsUpdate = true;
+          if (p.life <= 0) {
+            this.scene.remove(p.mesh);
+            p.mesh.geometry.dispose();
+            p.mesh.material.dispose();
+            this.particles.splice(i, 1);
+          }
+        }
+      }
+    }
+
+    // --- 11. WORLD BUILDER ---
+    class WorldBuilder {
+      constructor(scene) {
+        this.scene = scene;
+        this.colliders = [];
+      }
+      build() {
+        const groundGeo = new THREE.PlaneGeometry(120, 120);
+        const groundMat = new THREE.MeshLambertMaterial({ color: 0x3d5c2a });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        this.scene.add(ground);
+
+        const pathGeo = new THREE.PlaneGeometry(8, 60);
+        const pathMat = new THREE.MeshLambertMaterial({ color: 0x6e5233 });
+        const path = new THREE.Mesh(pathGeo, pathMat);
+        path.rotation.x = -Math.PI / 2;
+        path.position.set(0, 0.02, 0);
+        path.receiveShadow = true;
+        this.scene.add(path);
+
+        this.createBarn(-18, 0, -10);
+        this.createShopStall(12, 0, -4);
+        this.createFences();
+
+        this.scene.background = new THREE.Color(0x87ceeb);
+        this.scene.fog = new THREE.FogExp2(0xcce0ff, 0.015);
+      }
+      createBarn(x, y, z) {
+        const barn = new THREE.Group();
+        barn.position.set(x, y, z);
+        const body = new THREE.Mesh(new THREE.BoxGeometry(14, 8, 18), new THREE.MeshLambertMaterial({ color: 0x992222 }));
+        body.position.y = 4;
+        body.castShadow = true;
+        body.receiveShadow = true;
+        barn.add(body);
+
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(11, 4, 4), new THREE.MeshLambertMaterial({ color: 0x222222 }));
+        roof.position.y = 10;
+        roof.rotation.y = Math.PI / 4;
+        roof.scale.set(1.1, 1, 1.4);
+        barn.add(roof);
+
+        this.scene.add(barn);
+        this.colliders.push(new THREE.Box3().setFromObject(body));
+      }
+      createShopStall(x, y, z) {
+        const stall = new THREE.Group();
+        stall.position.set(x, y, z);
+        const counter = new THREE.Mesh(new THREE.BoxGeometry(4, 1.8, 2.5), new THREE.MeshLambertMaterial({ color: 0x5c4033 }));
+        counter.position.y = 0.9;
+        counter.castShadow = true;
+        stall.add(counter);
+
+        const canopy = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.2, 3), new THREE.MeshLambertMaterial({ color: 0x2563eb }));
+        canopy.position.y = 3.2;
+        stall.add(canopy);
+
+        const sign = new THREE.Mesh(new THREE.BoxGeometry(3, 0.7, 0.2), new THREE.MeshLambertMaterial({ color: 0xfacc15 }));
+        sign.position.set(0, 2.6, 1.25);
+        stall.add(sign);
+
+        this.scene.add(stall);
+        this.colliders.push(new THREE.Box3().setFromObject(counter));
+        this.shopZone = new THREE.Vector3(x, 1, z);
+      }
+      createFences() {
+        const fenceMat = new THREE.MeshLambertMaterial({ color: 0x6e5233 });
+        const postGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.5);
+        const railGeo = new THREE.BoxGeometry(3.8, 0.15, 0.08);
+
+        for (let i = -24; i <= 24; i += 4) {
+          const p1 = new THREE.Mesh(postGeo, fenceMat);
+          p1.position.set(i, 0.75, -28);
+          this.scene.add(p1);
+          const r1 = new THREE.Mesh(railGeo, fenceMat);
+          r1.position.set(i + 2, 0.9, -28);
+          this.scene.add(r1);
+
+          const p2 = new THREE.Mesh(postGeo, fenceMat);
+          p2.position.set(i, 0.75, 28);
+          this.scene.add(p2);
+          const r2 = new THREE.Mesh(railGeo, fenceMat);
+          r2.position.set(i + 2, 0.9, 28);
+          this.scene.add(r2);
+        }
+      }
+    }
+
+    // --- 12. HAY SYSTEM ---
+    class HaySystem {
+      constructor(scene) {
+        this.scene = scene;
+        this.piles = [];
+        this.strawCount = 180;
+        this.initPiles();
+      }
+      initPiles() {
+        const locs = [
+          { x: 0, z: -8, initial: 100 },
+          { x: -5, z: 4, initial: 100 },
+          { x: 5, z: 8, initial: 100 }
+        ];
+        const geo = new THREE.CylinderGeometry(0.04, 0.07, 1.1, 4);
+        const mat = new THREE.MeshLambertMaterial({ color: 0xeab308 });
+
+        locs.forEach((loc, idx) => {
+          const mesh = new THREE.InstancedMesh(geo, mat, this.strawCount);
+          mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+
+          const dummy = new THREE.Object3D();
+          const instData = [];
+
+          for (let i = 0; i < this.strawCount; i++) {
+            const rad = Math.sqrt(Math.random()) * 2.2;
+            const angle = Math.random() * Math.PI * 2;
+            dummy.position.set(loc.x + Math.cos(angle) * rad, Math.max(0.1, (1.8 - rad * 0.7) * Math.random()), loc.z + Math.sin(angle) * rad);
+            dummy.rotation.set((Math.random() - 0.5) * 1.2, Math.random() * Math.PI, (Math.random() - 0.5) * 1.2);
+            dummy.scale.set(1, 0.7 + Math.random() * 0.6, 1);
+            dummy.updateMatrix();
+
+            mesh.setMatrixAt(i, dummy.matrix);
+            instData.push({ basePos: dummy.position.clone() });
+          }
+          mesh.instanceMatrix.needsUpdate = true;
+          this.scene.add(mesh);
+
+          this.piles.push({
+            id: idx,
+            position: new THREE.Vector3(loc.x, 0, loc.z),
+            mesh: mesh,
+            instances: instData,
+            remainingHay: loc.initial,
+            maxHay: loc.initial,
+            boundingSphere: new THREE.Sphere(new THREE.Vector3(loc.x, 1, loc.z), 2.8)
+          });
+        });
+      }
+      removeHay(pile, amount) {
+        if (pile.remainingHay <= 0) return 0;
+        const actual = Math.min(pile.remainingHay, amount);
+        pile.remainingHay -= actual;
+
+        const targetActive = Math.ceil((pile.remainingHay / pile.maxHay) * this.strawCount);
+        const dummy = new THREE.Object3D();
+        dummy.scale.set(0, 0, 0);
+        dummy.updateMatrix();
+
+        for (let i = targetActive; i < this.strawCount; i++) {
+          pile.mesh.setMatrixAt(i, dummy.matrix);
+        }
+        pile.mesh.instanceMatrix.needsUpdate = true;
+
+        if (pile.remainingHay <= 0) setTimeout(() => this.respawn(pile), 6000);
+        return actual;
+      }
+      respawn(pile) {
+        pile.remainingHay = pile.maxHay;
+        const dummy = new THREE.Object3D();
+        for (let i = 0; i < this.strawCount; i++) {
+          dummy.position.copy(pile.instances[i].basePos);
+          dummy.rotation.set((Math.random() - 0.5) * 1.2, Math.random() * Math.PI, (Math.random() - 0.5) * 1.2);
+          dummy.scale.set(1, 0.7 + Math.random() * 0.6, 1);
+          dummy.updateMatrix();
+          pile.mesh.setMatrixAt(i, dummy.matrix);
+        }
+        pile.mesh.instanceMatrix.needsUpdate = true;
+      }
+    }
+
+    // --- 13. MK-1 PROCESSOR MACHINE ---
+    class MachineSystem {
+      constructor(scene, sounds) {
+        this.scene = scene;
+        this.sounds = sounds;
+        this.owned = false;
+        this.position = new THREE.Vector3(12, 0, 10);
+        this.processedBuffer = 0;
+        this.foundNeedlesBuffer = 0;
+        this.timer = 0;
+        this.build3DModel();
+      }
+      build3DModel() {
+        this.group = new THREE.Group();
+        this.group.position.copy(this.position);
+
+        const tank = new THREE.Mesh(new THREE.BoxGeometry(3.2, 2.2, 2.5), new THREE.MeshLambertMaterial({ color: 0x334155 }));
+        tank.position.y = 1.1;
+        tank.castShadow = true;
+        this.group.add(tank);
+
+        const hopper = new THREE.Mesh(new THREE.ConeGeometry(1.6, 1.4, 4), new THREE.MeshLambertMaterial({ color: 0x475569 }));
+        hopper.position.set(0, 2.5, 0);
+        hopper.rotation.y = Math.PI / 4;
+        this.group.add(hopper);
+
+        this.gearMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.2, 8), new THREE.MeshLambertMaterial({ color: 0xfacc15 }));
+        this.gearMesh.position.set(1.62, 1.4, 0);
+        this.gearMesh.rotation.z = Math.PI / 2;
+        this.group.add(this.gearMesh);
+
+        this.scene.add(this.group);
+      }
+      update(delta, game) {
+        if (!this.owned) return;
+        this.gearMesh.rotation.y += delta * 4;
+        this.timer += delta;
+        if (this.timer >= 3.5) {
+          this.timer = 0;
+          this.processedBuffer += 2;
+          this.sounds.playMachineClank();
+          if (Math.random() < 0.05) this.foundNeedlesBuffer += 1;
+          game.vfx.spawnSmoke(this.position.x - 1.1, 2.8, this.position.z - 0.6);
+        }
+      }
+      collectOutput(game) {
+        if (!this.owned) return;
+        if (this.processedBuffer === 0 && this.foundNeedlesBuffer === 0) {
+          game.showToast('خزان الآلة فارغ حالياً');
+          return;
+        }
+        const h = this.processedBuffer;
+        const n = this.foundNeedlesBuffer;
+        if (h > 0) game.inventory.addItem('processed_hay', h);
+        if (n > 0) game.inventory.addItem('needle_iron', n);
+
+        this.processedBuffer = 0;
+        this.foundNeedlesBuffer = 0;
+        game.sounds.playRustle();
+        game.updateHUD();
+        game.showToast(`تم تفريغ الآلة: ${h} قش معالج ${n > 0 ? `و ${n} إبرة!` : ''}`);
+      }
+    }
+
+    // --- 14. PLAYER VIEWMODEL & CONTROLLER ---
+    class PlayerController {
+      constructor(camera, soundSys, skills) {
+        this.camera = camera;
+        this.sounds = soundSys;
+        this.skills = skills;
+        this.position = new THREE.Vector3(0, 1.65, 12);
+        this.velocity = new THREE.Vector3();
+        this.yaw = 0;
+        this.pitch = 0;
+        this.isGrounded = true;
+        this.isSprinting = false;
+        this.baseMoveSpeed = 4.2;
+        this.bobTimer = 0;
+        this.defaultY = 1.65;
+        this.moveInput = { x: 0, z: 0 };
+
+        this.initViewmodel();
+        this.initDesktopDebug();
+      }
+      initViewmodel() {
+        this.toolPivot = new THREE.Group();
+        this.camera.add(this.toolPivot);
+        this.toolPivot.position.set(0.35, -0.32, -0.6);
+
+        this.toolMeshGroup = new THREE.Group();
+        this.toolPivot.add(this.toolMeshGroup);
+        this.buildHandMesh();
+        this.isSwinging = false;
+        this.swingProgress = 0;
+      }
+      buildHandMesh() {
+        while (this.toolMeshGroup.children.length > 0) this.toolMeshGroup.remove(this.toolMeshGroup.children[0]);
+        const hand = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.28), new THREE.MeshLambertMaterial({ color: 0xd29a68 }));
+        this.toolMeshGroup.add(hand);
+      }
+      buildRakeMesh() {
+        while (this.toolMeshGroup.children.length > 0) this.toolMeshGroup.remove(this.toolMeshGroup.children[0]);
+        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.8), new THREE.MeshLambertMaterial({ color: 0x8b5a2b }));
+        handle.rotation.x = Math.PI / 3;
+        this.toolMeshGroup.add(handle);
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.04, 0.06), new THREE.MeshLambertMaterial({ color: 0x475569 }));
+        head.position.set(0, 0.35, -0.2);
+        this.toolMeshGroup.add(head);
+      }
+      setToolVisual(toolId) {
+        if (toolId === 'small_rake') this.buildRakeMesh();
+        else this.buildHandMesh();
+      }
+      triggerAction() {
+        if (this.isSwinging) return;
+        this.isSwinging = true;
+        this.swingProgress = 0;
+      }
+      jump() {
+        if (this.isGrounded) {
+          this.velocity.y = 5.2;
+          this.isGrounded = false;
+          this.sounds.playStep();
+        }
+      }
+      initDesktopDebug() {
+        window.addEventListener('keydown', (e) => {
+          if (e.code === 'KeyW') this.moveInput.z = -1;
+          if (e.code === 'KeyS') this.moveInput.z = 1;
+          if (e.code === 'KeyA') this.moveInput.x = -1;
+          if (e.code === 'KeyD') this.moveInput.x = 1;
+          if (e.code === 'Space') this.jump();
+          if (e.shiftKey) this.isSprinting = true;
+        });
+        window.addEventListener('keyup', (e) => {
+          if (['KeyW', 'KeyS'].includes(e.code)) this.moveInput.z = 0;
+          if (['KeyA', 'KeyD'].includes(e.code)) this.moveInput.x = 0;
+          if (!e.shiftKey) this.isSprinting = false;
+        });
+      }
+      update(delta) {
+        this.camera.rotation.order = 'YXZ';
+        this.camera.rotation.y = this.yaw;
+        this.camera.rotation.x = this.pitch;
+
+        const agilityBonus = 1 + (this.skills.skills.agility.level * 0.15);
+        const currentSpeed = (this.isSprinting ? this.baseMoveSpeed * 1.6 : this.baseMoveSpeed) * agilityBonus * delta;
+
+        const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+        const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
+        const moveDir = new THREE.Vector3().addScaledVector(right, this.moveInput.x).addScaledVector(forward, -this.moveInput.z);
+
+        if (moveDir.lengthSq() > 0.001) {
+          moveDir.normalize();
+          this.position.addScaledVector(moveDir, currentSpeed);
+          this.bobTimer += delta * (this.isSprinting ? 14 : 9);
+          this.camera.position.y = this.defaultY + Math.sin(this.bobTimer) * 0.04;
+          if (Math.sin(this.bobTimer) < -0.95) this.sounds.playStep();
+        } else {
+          this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, this.defaultY, 0.1);
+        }
+
+        this.velocity.y -= 9.8 * 1.5 * delta;
+        this.position.y += this.velocity.y * delta;
+        if (this.position.y <= this.defaultY) {
+          this.position.y = this.defaultY;
+          this.velocity.y = 0;
+          this.isGrounded = true;
+        }
+
+        this.position.x = THREE.MathUtils.clamp(this.position.x, -26, 26);
+        this.position.z = THREE.MathUtils.clamp(this.position.z, -26, 26);
+        this.camera.position.x = this.position.x;
+        this.camera.position.z = this.position.z;
+
+        if (this.isSwinging) {
+          this.swingProgress += delta * 7.5;
+          const arc = Math.sin(this.swingProgress * Math.PI);
+          this.toolPivot.rotation.x = -arc * 0.8;
+          this.toolPivot.rotation.y = arc * 0.4;
+          this.toolPivot.position.z = -0.6 + arc * 0.15;
+          if (this.swingProgress >= 1) {
+            this.isSwinging = false;
+            this.toolPivot.rotation.set(0, 0, 0);
+            this.toolPivot.position.set(0.35, -0.32, -0.6);
+          }
+        }
+      }
+    }
+
+    // --- 15. MAIN GAME ENGINE ---
+    class GameEngine {
+      constructor() {
+        this.canvas = document.getElementById('game-canvas');
+        this.sounds = new SoundSystem();
+        this.storage = new SaveSystem();
+        this.inventory = new Inventory(16);
+
+        this.skills = new SkillTree();
+        this.progression = new ProgressionSystem((lvl) => this.onLevelUp(lvl));
+        this.missions = new MissionSystem(this);
+
+        this.money = 0;
+        this.activeToolId = 'hands';
+        this.unlockedTools = ['hands'];
+
+        this.initThree();
+        this.world = new WorldBuilder(this.scene);
+        this.world.build();
+
+        this.haySystem = new HaySystem(this.scene);
+        this.vfx = new ParticleEngine(this.scene);
+        this.machines = new MachineSystem(this.scene, this.sounds);
+        this.conveyor = new ConveyorSystem(this.scene, this.sounds);
+        this.events = new RandomEventManager(this);
+        this.player = new PlayerController(this.camera, this.sounds, this.skills);
+
+        this.raycaster = new THREE.Raycaster();
+        this.currentTarget = null;
+        this.lastActionTime = 0;
+        this.goldenPileMesh = null;
+
+        this.initTouch();
+        this.initModals();
+        this.bindEvents();
+
+        this.loadGame();
+        this.startAutosave();
+        this.initPWAInstaller();
+      }
+
+      initThree() {
+        this.scene = new THREE.Scene();
+        this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
+
+        this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: 'high-performance' });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.65);
+        hemi.position.set(0, 50, 0);
+        this.scene.add(hemi);
+
+        this.dirLight = new THREE.DirectionalLight(0xfffaed, 0.95);
+        this.dirLight.position.set(20, 40, 20);
+        this.dirLight.castShadow = true;
+        this.dirLight.shadow.mapSize.width = 1024;
+        this.dirLight.shadow.mapSize.height = 1024;
+        const d = 30;
+        this.dirLight.shadow.camera.left = -d;
+        this.dirLight.shadow.camera.right = d;
+        this.dirLight.shadow.camera.top = d;
+        this.dirLight.shadow.camera.bottom = -d;
+        this.scene.add(this.dirLight);
+
+        window.addEventListener('resize', () => {
+          this.camera.aspect = window.innerWidth / window.innerHeight;
+          this.camera.updateProjectionMatrix();
+          this.renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+      }
+
+      setGraphicsQuality(level) {
+        if (level === 'low') {
+          this.renderer.setPixelRatio(1.0);
+          this.renderer.shadowMap.enabled = false;
+          this.vfx.densityFactor = 0.2;
+          this.scene.fog.density = 0.025;
+        } else if (level === 'med') {
+          this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+          this.renderer.shadowMap.enabled = true;
+          this.renderer.shadowMap.type = THREE.BasicShadowMap;
+          this.vfx.densityFactor = 0.7;
+          this.scene.fog.density = 0.015;
+        } else {
+          this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2.0));
+          this.renderer.shadowMap.enabled = true;
+          this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          this.vfx.densityFactor = 1.0;
+          this.scene.fog.density = 0.012;
+        }
+      }
+
+      onLevelUp(level) {
+        this.sounds.playLevelUp();
+        this.money += 25;
+        this.updateHUD();
+        this.showToast(`🎉 ترقية! وصلت للمستوى ${level} ونلت $25 ونقطة مهارة!`);
+      }
+
+      initTouch() {
+        const joy = document.getElementById('joystick-container');
+        const knob = document.getElementById('joystick-knob');
+        let joyId = null;
+        let joyCenter = { x: 0, y: 0 };
+
+        joy.addEventListener('touchstart', (e) => {
+          this.sounds.init();
+          const t = e.changedTouches[0];
+          joyId = t.identifier;
+          const rect = joy.getBoundingClientRect();
+          joyCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+          this.updateJoy(t.clientX, t.clientY, joyCenter, knob);
+        }, { passive: false });
+
+        window.addEventListener('touchmove', (e) => {
+          for (let i = 0; i < e.changedTouches.length; i++) {
+            const t = e.changedTouches[i];
+            if (t.identifier === joyId) this.updateJoy(t.clientX, t.clientY, joyCenter, knob);
+          }
+        }, { passive: false });
+
+        const reset = () => {
+          joyId = null;
+          knob.style.transform = 'translate(0px, 0px)';
+          this.player.moveInput = { x: 0, z: 0 };
+        };
+        window.addEventListener('touchend', reset);
+        window.addEventListener('touchcancel', reset);
+
+        // Touch Look
+        const look = document.getElementById('touch-look-zone');
+        let lookId = null;
+        let lastLook = { x: 0, y: 0 };
+
+        look.addEventListener('touchstart', (e) => {
+          this.sounds.init();
+          const t = e.changedTouches[0];
+          lookId = t.identifier;
+          lastLook = { x: t.clientX, y: t.clientY };
+        }, { passive: false });
+
+        window.addEventListener('touchmove', (e) => {
+          for (let i = 0; i < e.changedTouches.length; i++) {
+            const t = e.changedTouches[i];
+            if (t.identifier === lookId) {
+              const dx = t.clientX - lastLook.x;
+              const dy = t.clientY - lastLook.y;
+              lastLook = { x: t.clientX, y: t.clientY };
+              this.player.yaw -= dx * 0.004;
+              this.player.pitch -= dy * 0.004;
+              this.player.pitch = Math.max(-Math.PI / 2.3, Math.min(Math.PI / 2.3, this.player.pitch));
+            }
+          }
+        }, { passive: false });
+        window.addEventListener('touchend', () => { lookId = null; });
+      }
+
+      updateJoy(x, y, center, knobEl) {
+        const dx = x - center.x;
+        const dy = y - center.y;
+        const dist = Math.hypot(dx, dy);
+        const maxR = 45;
+        const clamped = Math.min(dist, maxR);
+        const angle = Math.atan2(dy, dx);
+        const nx = Math.cos(angle) * clamped;
+        const ny = Math.sin(angle) * clamped;
+
+        knobEl.style.transform = `translate(${nx}px, ${ny}px)`;
+        this.player.moveInput.x = nx / maxR;
+        this.player.moveInput.z = ny / maxR;
+      }
+
+      bindEvents() {
+        document.getElementById('btn-jump').addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          this.sounds.init();
+          this.player.jump();
+        });
+        document.getElementById('btn-action').addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          this.sounds.init();
+          this.performAction();
+        });
+        document.getElementById('btn-interact').addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          this.sounds.init();
+          this.performInteraction();
+        });
+        window.addEventListener('mousedown', (e) => {
+          if (e.target.tagName !== 'BUTTON' && !e.target.closest('.modal')) {
+            this.sounds.init();
+            this.performAction();
+          }
+        });
+      }
+
+      initModals() {
+        const invModal = document.getElementById('modal-inventory');
+        const shopModal = document.getElementById('modal-shop');
+        const skillsModal = document.getElementById('modal-skills');
+        const missionsModal = document.getElementById('modal-missions');
+        const settingsModal = document.getElementById('modal-settings');
+
+        document.getElementById('btn-inventory').addEventListener('click', () => {
+          this.renderInventory();
+          invModal.classList.add('active');
+        });
+        document.getElementById('btn-close-inv').addEventListener('click', () => invModal.classList.remove('active'));
+
+        document.getElementById('btn-close-shop').addEventListener('click', () => shopModal.classList.remove('active'));
+
+        document.getElementById('btn-open-skills').addEventListener('click', () => {
+          this.renderSkills();
+          skillsModal.classList.add('active');
+        });
+        document.getElementById('btn-close-skills').addEventListener('click', () => skillsModal.classList.remove('active'));
+
+        document.getElementById('btn-open-missions').addEventListener('click', () => {
+          this.renderMissions();
+          missionsModal.classList.add('active');
+        });
+        document.getElementById('btn-close-missions').addEventListener('click', () => missionsModal.classList.remove('active'));
+
+        document.getElementById('btn-open-settings').addEventListener('click', () => settingsModal.classList.add('active'));
+        document.getElementById('btn-close-settings').addEventListener('click', () => settingsModal.classList.remove('active'));
+
+        document.getElementById('select-graphics').addEventListener('change', (e) => {
+          this.setGraphicsQuality(e.target.value);
+          this.showToast(`تم تغيير الجودة إلى ${e.target.value}`);
+        });
+
+        document.getElementById('btn-manual-save').addEventListener('click', () => {
+          this.saveGame();
+          this.showToast('💾 تم حفظ اللعبة بنجاح!');
+        });
+
+        // Shop Operations
+        document.getElementById('btn-sell-hay').addEventListener('click', () => {
+          const rawHay = this.inventory.getItemCount('hay');
+          const procHay = this.inventory.getItemCount('processed_hay');
+          let traderBonus = 1 + (this.skills.skills.master_trader.level * 0.2);
+          if (this.events.activeEvent === 'vip_order') traderBonus *= 2.5;
+
+          if (rawHay > 0 || procHay > 0) {
+            let total = 0;
+            if (rawHay > 0) {
+              total += Math.round(rawHay * 1 * traderBonus);
+              this.inventory.removeItem('hay', rawHay);
+            }
+            if (procHay > 0) {
+              total += Math.round(procHay * 3 * traderBonus);
+              this.inventory.removeItem('processed_hay', procHay);
+            }
+            this.money += total;
+            this.progression.addXP(Math.ceil(total * 0.5));
+            this.missions.trackProgress('money_earned', total);
+            this.sounds.playCoin();
+            this.updateHUD();
+            this.showToast(`تم بيع المحاصيل بمبلغ $${total}!`);
+          } else {
+            this.showToast('لا يوجد قش في الحقيبة للبيع');
+          }
+        });
+
+        document.getElementById('btn-sell-items').addEventListener('click', () => {
+          let total = 0;
+          let traderBonus = 1 + (this.skills.skills.master_trader.level * 0.2);
+          if (this.events.activeEvent === 'vip_order') traderBonus *= 2.5;
+
+          ['needle_iron', 'needle_silver', 'needle_gold'].forEach(id => {
+            const count = this.inventory.getItemCount(id);
+            if (count > 0) {
+              const val = Math.round(ITEM_DATABASE[id].value * traderBonus);
+              this.inventory.removeItem(id, count);
+              total += count * val;
+            }
+          });
+          if (total > 0) {
+            this.money += total;
+            this.progression.addXP(Math.ceil(total * 0.6));
+            this.missions.trackProgress('money_earned', total);
+            this.sounds.playCoin();
+            this.updateHUD();
+            this.showToast(`تم بيع الكنوز بمبلغ $${total}!`);
+          } else {
+            this.showToast('لا توجد إبر لبيعها');
+          }
+        });
+
+        document.getElementById('btn-buy-rake').addEventListener('click', () => {
+          if (this.unlockedTools.includes('small_rake')) {
+            this.showToast('أنت تملك المجرفة بالفعل!');
+            return;
+          }
+          if (this.money >= 25) {
+            this.money -= 25;
+            this.unlockedTools.push('small_rake');
+            this.activeToolId = 'small_rake';
+            this.player.setToolVisual('small_rake');
+            this.inventory.addItem('rake_small', 1);
+            this.missions.trackProgress('has_rake', 1);
+            this.sounds.playCoin();
+            this.updateHUD();
+            this.showToast('مبروك! تم شراء مجرفة القش!');
+          } else {
+            this.showToast('لا تملك $25 كافية');
+          }
+        });
+
+        document.getElementById('btn-buy-machine').addEventListener('click', () => {
+          if (this.machines.owned) {
+            this.showToast('أنت تملك الآلة بالفعل!');
+            return;
+          }
+          if (this.money >= 80) {
+            this.money -= 80;
+            this.machines.owned = true;
+            this.missions.trackProgress('has_machine', 1);
+            this.sounds.playCoin();
+            this.updateHUD();
+            this.showToast('🏭 تم تفعيل آلة المعالجة التلقائية!');
+          } else {
+            this.showToast('تحتاج $80 لشراء الآلة');
+          }
+        });
+
+        document.getElementById('btn-buy-conveyor').addEventListener('click', () => {
+          if (this.conveyor.owned) {
+            this.showToast('أنت تملك خط النقل والفرز بالفعل!');
+            return;
+          }
+          if (this.money >= 150) {
+            this.money -= 150;
+            this.conveyor.owned = true;
+            this.missions.trackProgress('has_conveyor', 1);
+            this.sounds.playCoin();
+            this.updateHUD();
+            this.showToast('🚀 رائع! تم تشغيل خط سيور النقل والفرز الآلي!');
+          } else {
+            this.showToast('تحتاج $150 لتشغيل خط النقل');
+          }
+        });
+      }
+
+      renderInventory() {
+        const c = document.getElementById('inv-slots-container');
+        c.innerHTML = '';
+        this.inventory.slots.forEach(s => {
+          const div = document.createElement('div');
+          div.className = `inv-slot ${s ? 'filled' : ''}`;
+          if (s) {
+            const item = ITEM_DATABASE[s.id];
+            div.innerHTML = `
+              <div class="icon">${item.icon}</div>
+              <div style="font-size: 8px; text-align: center;">${item.name}</div>
+              ${s.amount > 1 ? `<span class="count">${s.amount}</span>` : ''}
+            `;
+            if (item.isTool) {
+              div.style.borderColor = '#60a5fa';
+              div.addEventListener('click', () => {
+                this.activeToolId = item.toolId;
+                this.player.setToolVisual(item.toolId);
+                this.updateHUD();
+                this.showToast(`تم تجهيز: ${item.name}`);
+              });
+            }
+          }
+          c.appendChild(div);
+        });
+      }
+
+      renderSkills() {
+        document.getElementById('sp-count-modal').textContent = this.progression.skillPoints;
+        const c = document.getElementById('skills-list-container');
+        c.innerHTML = '';
+        Object.keys(this.skills.skills).forEach(k => {
+          const sk = this.skills.skills[k];
+          const div = document.createElement('div');
+          div.className = 'list-card';
+          div.innerHTML = `
+            <div class="card-info">
+              <span class="card-title">${sk.name} <span class="card-badge">(المستوى ${sk.level}/${sk.max})</span></span>
+              <span class="card-desc">${sk.desc}</span>
+            </div>
+            <button class="action-btn-sm" ${this.progression.skillPoints > 0 && sk.level < sk.max ? '' : 'disabled'}>
+              ${sk.level >= sk.max ? 'مكتمل' : 'ترقية (1 SP)'}
+            </button>
+          `;
+          div.querySelector('button').addEventListener('click', () => {
+            if (this.skills.upgradeSkill(k, this.progression)) {
+              this.sounds.playCoin();
+              this.renderSkills();
+              this.updateHUD();
+            }
+          });
+          c.appendChild(div);
+        });
+      }
+
+      renderMissions() {
+        const c = document.getElementById('missions-list-container');
+        c.innerHTML = '';
+        this.missions.missions.forEach(m => {
+          const div = document.createElement('div');
+          div.className = 'list-card';
+          div.innerHTML = `
+            <div class="card-info">
+              <span class="card-title">${m.title}</span>
+              <span class="card-desc">${m.desc} (${m.current}/${m.target})</span>
+              <span class="card-badge">المكافأة: $${m.rewardMoney} + ${m.rewardXP} XP</span>
+            </div>
+            <button class="action-btn-sm" ${m.completed && !m.claimed ? '' : 'disabled'}>
+              ${m.claimed ? 'تم الاستلام' : (m.completed ? 'استلام المكافأة' : 'قيد التقدم')}
+            </button>
+          `;
+          if (m.completed && !m.claimed) {
+            div.querySelector('button').addEventListener('click', () => {
+              this.missions.claimReward(m.id);
+              this.renderMissions();
+            });
+          }
+          c.appendChild(div);
+        });
+      }
+
+      updateHUD() {
+        document.getElementById('hud-money').textContent = `$${this.money}`;
+        document.getElementById('hud-hay').textContent = `قش: ${this.inventory.getItemCount('hay')}`;
+        document.getElementById('hud-level-txt').textContent = `المستوى ${this.progression.level}`;
+
+        const curXp = this.progression.xp;
+        const tarXp = this.progression.getXpForNextLevel();
+        document.getElementById('hud-xp-txt').textContent = `${curXp}/${tarXp}`;
+        document.getElementById('hud-xp-fill').style.width = `${Math.min(100, (curXp / tarXp) * 100)}%`;
+
+        document.getElementById('sp-indicator').textContent = `(${this.progression.skillPoints})`;
+        this.missions.updateBadge();
+      }
+
+      showToast(msg) {
+        const toast = document.getElementById('toast');
+        toast.textContent = msg;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 2300);
+      }
+
+      spawnGoldenPile() {
+        if (this.goldenPileMesh) return;
+        const geo = new THREE.ConeGeometry(2.5, 2.2, 8);
+        const mat = new THREE.MeshLambertMaterial({ color: 0xffd700, emissive: 0x664400 });
+        this.goldenPileMesh = new THREE.Mesh(geo, mat);
+        this.goldenPileMesh.position.set(-6, 1.1, -2);
+        this.goldenPileMesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(-6, 1, -2), 3.0);
+        this.goldenPileRemaining = 50;
+        this.scene.add(this.goldenPileMesh);
+      }
+
+      removeGoldenPile() {
+        if (this.goldenPileMesh) {
+          this.scene.remove(this.goldenPileMesh);
+          this.goldenPileMesh = null;
+        }
+      }
+
+      checkRaycastInteraction() {
+        this.raycaster.setFromCamera({ x: 0, y: 0 }, this.camera);
+        const promptEl = document.getElementById('interaction-prompt');
+        const promptText = document.getElementById('prompt-text');
+        const promptIcon = document.getElementById('prompt-icon');
+
+        // Check Golden Hay Event Pile
+        if (this.goldenPileMesh) {
+          if (this.player.position.distanceTo(this.goldenPileMesh.position) < 4.0) {
+            promptEl.style.display = 'flex';
+            promptIcon.textContent = '🌟';
+            promptText.textContent = `حصاد الكومة الذهبية (${this.goldenPileRemaining}) [عمل]`;
+            this.currentTarget = { type: 'golden_pile' };
+            return;
+          }
+        }
+
+        // Check Hay Piles
+        let foundPile = null;
+        for (const p of this.haySystem.piles) {
+          if (this.player.position.distanceTo(p.position) < 3.8) {
+            if (this.raycaster.ray.intersectsSphere(p.boundingSphere)) {
+              foundPile = p;
+              break;
+            }
+          }
+        }
+
+        // Check Shop
+        if (this.player.position.distanceTo(this.world.shopZone) < 4.0) {
+          promptEl.style.display = 'flex';
+          promptIcon.textContent = '🏪';
+          promptText.textContent = 'فتح محطة التجارة [تفاعل]';
+          this.currentTarget = { type: 'shop' };
+          return;
+        }
+
+        // Check Machine
+        if (this.player.position.distanceTo(this.machines.position) < 4.5) {
+          promptEl.style.display = 'flex';
+          promptIcon.textContent = '🏭';
+          promptText.textContent = this.machines.owned
+            ? `تفريغ خزان الآلة (${this.machines.processedBuffer}) [تفاعل]`
+            : 'شراء الآلة من المتجر [تفاعل]';
+          this.currentTarget = { type: 'machine' };
+          return;
+        }
+
+        // Check Conveyor Output
+        if (this.conveyor.owned && this.player.position.distanceTo(this.conveyor.collectorPos) < 4.0) {
+          promptEl.style.display = 'flex';
+          promptIcon.textContent = '📦';
+          promptText.textContent = `تفريغ سير النقل (${this.conveyor.storageBuffer} قش جاهز) [تفاعل]`;
+          this.currentTarget = { type: 'conveyor' };
+          return;
+        }
+
+        if (foundPile && foundPile.remainingHay > 0) {
+          promptEl.style.display = 'flex';
+          promptIcon.textContent = '🌾';
+          promptText.textContent = `إزالة القش (${foundPile.remainingHay}/${foundPile.maxHay})`;
+          this.currentTarget = { type: 'hay', pile: foundPile };
+        } else {
+          promptEl.style.display = 'none';
+          this.currentTarget = null;
+        }
+      }
+
+      performAction() {
+        const now = performance.now();
+        const tool = TOOLS_CONFIG[this.activeToolId];
+        if (now - this.lastActionTime < tool.cooldown) return;
+        this.lastActionTime = now;
+
+        this.player.triggerAction();
+        this.sounds.playRustle();
+
+        if (this.currentTarget && this.currentTarget.type === 'golden_pile') {
+          this.goldenPileRemaining -= 2;
+          this.inventory.addItem('processed_hay', 2);
+          this.progression.addXP(40);
+          this.vfx.spawnHayBurst(-6, 1.2, -2, true);
+
+          // 5x Needle chance on golden pile
+          if (Math.random() < 0.35) {
+            this.inventory.addItem('needle_gold', 1);
+            this.sounds.playNeedleFind();
+            this.showToast('🌟 عثرت على إبرة ذهبية في الكومة الخاصة!');
+          }
+          if (this.goldenPileRemaining <= 0) this.removeGoldenPile();
+          this.updateHUD();
+          return;
+        }
+
+        if (this.currentTarget && this.currentTarget.type === 'hay') {
+          const extraHay = this.skills.skills.heavy_sweep.level;
+          const removed = this.haySystem.removeHay(this.currentTarget.pile, tool.hayPerUse + extraHay);
+
+          if (removed > 0) {
+            this.inventory.addItem('hay', removed);
+            this.progression.addXP(removed * 2);
+            this.missions.trackProgress('hay', removed);
+            this.vfx.spawnHayBurst(this.currentTarget.pile.position.x, 0.6, this.currentTarget.pile.position.z);
+
+            // Needle Chance with Event Buff
+            let eventMult = 1.0;
+            if (this.events.activeEvent === 'magnetic_rush') eventMult = 3.0;
+
+            const hawkEyeBonus = 1 + (this.skills.skills.hawk_eye.level * 0.25);
+            const roll = Math.random() * 100;
+            const luck = tool.needleChanceBonus * hawkEyeBonus * eventMult;
+
+            if (roll < 0.9 * luck) {
+              this.inventory.addItem('needle_gold', 1);
+              this.progression.addXP(50);
+              this.missions.trackProgress('needle', 1);
+              this.sounds.playNeedleFind();
+              this.showToast('🌟 أسطوري! إبرة ذهبية أثرية!');
+            } else if (roll < 3.2 * luck) {
+              this.inventory.addItem('needle_silver', 1);
+              this.progression.addXP(25);
+              this.missions.trackProgress('needle', 1);
+              this.sounds.playNeedleFind();
+              this.showToast('✨ ممتاز! إبرة فضية لامعة!');
+            } else if (roll < 9.5 * luck) {
+              this.inventory.addItem('needle_iron', 1);
+              this.progression.addXP(10);
+              this.missions.trackProgress('needle', 1);
+              this.sounds.playNeedleFind();
+              this.showToast('🪡 إبرة حديدية في القش!');
+            }
+            this.updateHUD();
+          }
+        }
+      }
+
+      performInteraction() {
+        if (!this.currentTarget) return;
+        if (this.currentTarget.type === 'shop') {
+          document.getElementById('modal-shop').classList.add('active');
+        } else if (this.currentTarget.type === 'machine') {
+          if (this.machines.owned) this.machines.collectOutput(this);
+          else document.getElementById('modal-shop').classList.add('active');
+        } else if (this.currentTarget.type === 'conveyor') {
+          this.conveyor.collect(this);
+        } else if (['hay', 'golden_pile'].includes(this.currentTarget.type)) {
+          this.performAction();
+        }
+      }
+
+      initPWAInstaller() {
+        const installBtn = document.getElementById('btn-pwa-install');
+        let deferredPrompt = null;
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+          e.preventDefault();
+          deferredPrompt = e;
+          installBtn.style.display = 'flex';
+        });
+
+        installBtn.addEventListener('click', () => {
+          if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then(() => {
+              deferredPrompt = null;
+              installBtn.style.display = 'none';
+            });
+          } else {
+            this.showToast('لتثبيت اللعبة: اضغط على خيارات المتصفح ثم "إضافة إلى الشاشة الرئيسية"');
+          }
+        });
+      }
+
+      async loadGame() {
+        await this.storage.init();
+        const s = await this.storage.load();
+        if (s) {
+          this.money = s.money || 0;
+          this.activeToolId = s.activeToolId || 'hands';
+          this.unlockedTools = s.unlockedTools || ['hands'];
+          if (s.inventory) this.inventory.loadSlots(s.inventory);
+
+          if (s.progression) {
+            this.progression.level = s.progression.level || 1;
+            this.progression.xp = s.progression.xp || 0;
+            this.progression.skillPoints = s.progression.skillPoints || 0;
+          }
+          if (s.skills) {
+            Object.keys(s.skills).forEach(k => {
+              if (this.skills.skills[k]) this.skills.skills[k].level = s.skills[k].level;
+            });
+          }
+          if (s.missions) {
+            s.missions.forEach(sm => {
+              const lm = this.missions.missions.find(m => m.id === sm.id);
+              if (lm) {
+                lm.current = sm.current;
+                lm.completed = sm.completed;
+                lm.claimed = sm.claimed;
+              }
+            });
+          }
+          if (s.machines) {
+            this.machines.owned = s.machines.owned || false;
+            this.machines.processedBuffer = s.machines.processedBuffer || 0;
+            this.machines.foundNeedlesBuffer = s.machines.foundNeedlesBuffer || 0;
+          }
+          if (s.conveyor) {
+            this.conveyor.owned = s.conveyor.owned || false;
+            this.conveyor.storageBuffer = s.conveyor.storageBuffer || 0;
+          }
+
+          this.player.setToolVisual(this.activeToolId);
+          this.updateHUD();
+          this.showToast('تم استعادة التقدم المحفوظ بنجاح');
+        } else {
+          this.updateHUD();
+        }
+      }
+
+      saveGame() {
+        const state = {
+          money: this.money,
+          activeToolId: this.activeToolId,
+          unlockedTools: this.unlockedTools,
+          inventory: this.inventory.slots,
+          progression: {
+            level: this.progression.level,
+            xp: this.progression.xp,
+            skillPoints: this.progression.skillPoints
+          },
+          skills: this.skills.skills,
+          missions: this.missions.missions.map(m => ({ id: m.id, current: m.current, completed: m.completed, claimed: m.claimed })),
+          machines: {
+            owned: this.machines.owned,
+            processedBuffer: this.machines.processedBuffer,
+            foundNeedlesBuffer: this.machines.foundNeedlesBuffer
+          },
+          conveyor: {
+            owned: this.conveyor.owned,
+            storageBuffer: this.conveyor.storageBuffer
+          }
+        };
+        this.storage.save(state);
+      }
+
+      startAutosave() {
+        setInterval(() => this.saveGame(), 10000);
+      }
+
+      start() {
+        let lastTime = performance.now();
+        const loop = (time) => {
+          requestAnimationFrame(loop);
+          const delta = Math.min((time - lastTime) / 1000, 0.1);
+          lastTime = time;
+
+          this.player.update(delta);
+          this.machines.update(delta, this);
+          this.conveyor.update(delta, this);
+          this.events.update(delta);
+          this.vfx.update(delta);
+          this.checkRaycastInteraction();
+
+          this.renderer.render(this.scene, this.camera);
+        };
+        requestAnimationFrame(loop);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const game = new GameEngine();
+      game.start();
+    });
+  </script>
+</body>
+</html>
